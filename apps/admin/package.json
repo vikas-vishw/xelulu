@@ -1,0 +1,23 @@
+{
+  "name": "@xelulu/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Xelulu admin console. Internal only; never shipped to consumers.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "5.2.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.7"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2023",
+    "types": ["node"]
+  },
+  "include": [
+    "tooling/**/*.ts",
+    "services/*/test/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

@@ -1,0 +1,50 @@
+/* Phase 0 placeholder palette (shared with the parent app). No animation or transition. */
+:root {
+  color-scheme: light dark;
+  --xl-bg: #ffffff;
+  --xl-title: #1f2937;
+  --xl-body: #374151;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --xl-bg: #111827;
+    --xl-title: #f9fafb;
+    --xl-body: #e5e7eb;
+  }
+}
+
+body {
+  margin: 0;
+  background-color: var(--xl-bg);
+  color: var(--xl-body);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 0 1.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--xl-title);
+}
+
+p {
+  margin: 0.75rem 0 0;
+  font-size: 1.125rem;
+  color: var(--xl-body);
+}

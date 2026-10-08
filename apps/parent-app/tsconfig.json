@@ -1,0 +1,7 @@
+{
+  "extends": ["expo/tsconfig.base", "../../tsconfig.base.json"],
+  "compilerOptions": {
+    "noUncheckedSideEffectImports": false
+  },
+  "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"]
+}

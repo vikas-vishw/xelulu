@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Xelulu",
+    "slug": "xelulu",
+    "scheme": "xelulu",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

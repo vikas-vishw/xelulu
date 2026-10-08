@@ -1,0 +1,31 @@
+# Local development only.
+# EMQX uses its image's default dashboard credentials. They are for local development only:
+# never reuse them, and never expose these ports beyond 127.0.0.1.
+name: xelulu
+services:
+  emqx:
+    image: emqx/emqx:5.8.9 # Apache-2.0. EMQX 5.9+ is BSL 1.1 (see README).
+    ports:
+      - "127.0.0.1:1883:1883" # MQTT
+      - "127.0.0.1:8883:8883" # MQTTS
+      - "127.0.0.1:8083:8083" # MQTT over WS
+      - "127.0.0.1:8084:8084" # MQTT over WSS
+      - "127.0.0.1:18083:18083" # Dashboard
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    restart: "no"
+  gateway:
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    env_file:
+      - path: ./.env
+        required: false
+    restart: "no"
+  simulator:
+    build: { context: ., dockerfile: services/simulator/Dockerfile }
+    env_file:
+      - path: ./.env
+        required: false
+    restart: "no"
