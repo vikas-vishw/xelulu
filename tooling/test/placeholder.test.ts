@@ -1,5 +1,6 @@
-// Placeholder screen and boundary checks (Req 4.5, 4.6, 4.7, 4.9, 4.10, 5.4, 5.6, 5.8, 5.10, 6.6, 7.4).
-// Static source checks on the parent-app and admin placeholders, the built admin bundle, and the
+// Parent-app, admin and boundary source checks (Phase 0 Req 4.9, 4.10, 5.4, 5.6, 5.8, 5.10, 6.6,
+// 7.4; Phase 2.1 Req 10.2 for the parent-app block). Static source checks on the parent-app
+// design system and shell, the admin placeholder, the built admin bundle, and the
 // gateway/simulator sources. Everything is read with fs from the repo root; nothing is executed.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -7,6 +8,7 @@ import { extname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { findEnvReads } from "../checks/env-reads.js";
 import { parsePanel } from "../checks/panel.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -56,7 +58,74 @@ function moduleSpecifiers(source: string): string[] {
   return [...source.matchAll(re)].map((m) => m[2] ?? "");
 }
 
+/**
+ * One pass over a TypeScript source, splitting it into the code with comment text removed and
+ * the value of every string, template and single-quoted literal.
+ *
+ * Two of the Phase 2.2 scans need this rather than a plain regex over the whole file. The route
+ * literal ban is about *literals*, and several screens name their own route in a prose comment
+ * such as "`/device` is a Stack_Route". The mock-payload ban is about *payload*, and a mock
+ * module's header comment legitimately says which fields it refuses to carry ("no audio, no
+ * transcript"). Scanning the raw text would fail on both, for the opposite of the reason the
+ * check exists.
+ *
+ * Regular-expression literals are not parsed: `/` is only ever read as the start of a comment.
+ * No file under the parent app's `app/` or `src/` holds a regex literal, and the parent-app
+ * block is the only caller.
+ */
+function scanSource(source: string): Readonly<{ code: string; strings: readonly string[] }> {
+  let code = "";
+  const strings: string[] = [];
+  let i = 0;
+  while (i < source.length) {
+    const char = source[i];
+    if (char === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+    } else if (char === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) {
+        if (source[i] === "\n") code += "\n";
+        i += 1;
+      }
+      i += 2;
+    } else if (char === '"' || char === "'" || char === "`") {
+      const quote = char;
+      let value = "";
+      i += 1;
+      while (i < source.length && source[i] !== quote) {
+        if (source[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        value += source[i];
+        i += 1;
+      }
+      i += 1;
+      strings.push(value);
+      code += `${quote}${value}${quote}`;
+    } else {
+      code += char;
+      i += 1;
+    }
+  }
+  return { code, strings };
+}
+
 const NETWORK_MODULE_RE = /^(?:(?:node:)?(?:net|http|https|http2|dgram|tls)|(?:ws|mqtt)(?:\/.*)?)$/;
+
+/** The only folders in each service `src` tree allowed to import network modules (Req 22.2). */
+const TRANSPORT_DIRS: Readonly<Record<string, readonly string[]>> = {
+  "services/gateway/src": [
+    "services/gateway/src/mqtt/transport",
+    "services/gateway/src/audio/transport",
+    "services/gateway/src/operator/transport",
+  ],
+  "services/simulator/src": [
+    "services/simulator/src/mqtt/transport",
+    "services/simulator/src/audio/transport",
+    "services/simulator/src/control/transport",
+  ],
+};
 
 function stripCssComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -83,61 +152,337 @@ describe("placeholder screens and package boundaries", () => {
       expect(NETWORK_MODULE_RE.test("react-native")).toBe(false);
       expect(NETWORK_MODULE_RE.test("wsx")).toBe(false);
     });
+
+    it("separates comment prose from string literals", () => {
+      const sample = [
+        "// opens `/device` and holds no audio",
+        '/* a block mentioning "/privacy" */',
+        'const a = "/device";',
+        "const b = `tpl ${x} /privacy`;",
+        "const c = 'it\\'s fine';",
+      ].join("\n");
+      const { code, strings } = scanSource(sample);
+      expect(strings).toEqual(["/device", "tpl ${x} /privacy", "its fine"]);
+      expect(code).not.toContain("opens");
+      expect(code).not.toContain("a block mentioning");
+      expect(code).toContain('"/device"');
+    });
   });
 
+  // Phase 2.1 Req 10.2: the parent app is now a built design system, a navigation shell and the
+  // Home Dashboard, so these checks guard Req 1.4, 1.7, 3.4, 8.1, 8.2, 8.3, 8.4 and 8.6 instead
+  // of the Phase 0 placeholder screen.
   describe("parent app", () => {
-    const appFiles = sourceFiles("apps/parent-app/app");
-    const indexSource = read("apps/parent-app/app/index.tsx");
+    /** The Token_Source: the one file allowed to hold a raw colour value (Req 1.4). */
+    const TOKEN_SOURCE = "apps/parent-app/src/theme/tokens.json";
 
-    it("index has exactly two Text elements, the title is a header, and both use NativeWind", () => {
-      const tags = textOpenTags(indexSource);
-      expect(tags).toHaveLength(2);
-      for (const attrs of tags) expect(attrs).toMatch(/\bclassName\s*=/);
+    /** The app's config files, in Property 1's scope alongside `app/` and `src/` (Req 1.2). */
+    const CONFIG_FILES = [
+      "apps/parent-app/app.json",
+      "apps/parent-app/babel.config.js",
+      "apps/parent-app/global.css",
+      "apps/parent-app/jest.config.js",
+      "apps/parent-app/metro.config.js",
+      "apps/parent-app/nativewind-env.d.ts",
+      "apps/parent-app/tailwind.config.js",
+      "apps/parent-app/tsconfig.json",
+    ] as const;
 
-      const title = /<Text(?![\w.])([^>]*)>\s*Xelulu\s*<\/Text>/.exec(indexSource);
-      expect(title, "title Text 'Xelulu' not found").not.toBeNull();
-      expect(title?.[1] ?? "").toMatch(/\baccessibilityRole\s*=\s*\{?\s*["']header["']/);
-      expect(indexSource).toMatch(/<Text(?![\w.])[^>]*>\s*Phase 0 placeholder\s*<\/Text>/);
+    /** AppText plus the three Dense_Components: the only files that may cap font scaling. */
+    const FONT_CAP_FILES: ReadonlySet<string> = new Set([
+      "apps/parent-app/src/components/app-text.tsx",
+      "apps/parent-app/src/components/quick-action-tile.tsx",
+      "apps/parent-app/src/components/stat-tile.tsx",
+      "apps/parent-app/src/components/tab-bar.tsx",
+    ]);
 
-      // Only the layout and index files exist, and only index renders Text.
-      const others = appFiles.filter((abs) => !abs.endsWith("index.tsx"));
-      for (const abs of others)
-        expect(textOpenTags(readFileSync(abs, "utf8")), toRepoPath(abs)).toEqual([]);
+    const COLOUR_LITERAL = /#[0-9A-Fa-f]{3,8}\b|(?<![\w-])(?:rgba?|hsla?)\s*\(/;
+
+    /** Every source file under `app/` and `src/`. */
+    const sourcePaths = [
+      ...sourceFiles("apps/parent-app/app"),
+      ...sourceFiles("apps/parent-app/src"),
+    ]
+      .map(toRepoPath)
+      .sort();
+
+    /** Property 1's scope: every file under `app/` and `src/` plus the configs, less the tokens. */
+    const tokenScopePaths = [
+      ...walk(join(ROOT, "apps/parent-app/app")),
+      ...walk(join(ROOT, "apps/parent-app/src")),
+    ]
+      .map(toRepoPath)
+      .concat(CONFIG_FILES)
+      .filter((path) => path !== TOKEN_SOURCE)
+      .sort();
+
+    it("the scans cover the app's files, its configs and the Token_Source", () => {
+      expect(sourcePaths).toEqual(expect.arrayContaining(["apps/parent-app/app/index.tsx"]));
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      expect(tokenScopePaths).toEqual(expect.arrayContaining([...CONFIG_FILES]));
+      expect(tokenScopePaths).not.toContain(TOKEN_SOURCE);
+      // The Token_Source exists and does hold colour literals, so excluding it is not vacuous.
+      expect(read(TOKEN_SOURCE)).toMatch(COLOUR_LITERAL);
     });
 
-    it("every arbitrary text size is at least 16px and no small preset sizes are used", () => {
-      expect(appFiles.length).toBeGreaterThan(0);
-      for (const abs of appFiles) {
-        const src = readFileSync(abs, "utf8");
-        for (const m of src.matchAll(/(?<![\w-])text-\[(\d+(?:\.\d+)?)px\]/g)) {
-          expect(Number(m[1]), `${toRepoPath(abs)}: ${m[0]}`).toBeGreaterThanOrEqual(16);
-        }
-        expect(src, toRepoPath(abs)).not.toMatch(/(?<![\w-])text-(?:xs|sm|base)(?![\w-])/);
+    // Property 1: Single token source (Req 1.2, 1.4, 1.7).
+    it("holds no colour literal outside the Token_Source, no dark: class and no text-[Npx]", () => {
+      expect(tokenScopePaths.length).toBeGreaterThan(20);
+      for (const path of tokenScopePaths) {
+        const src = read(path);
+        expect(src, `${path} holds a colour literal`).not.toMatch(COLOUR_LITERAL);
+        expect(src, `${path} holds a dark: class`).not.toMatch(/(?<![\w-])dark:/);
+        expect(src, `${path} holds an arbitrary text size`).not.toMatch(
+          /(?<![\w-])text-\[\d+(?:\.\d+)?px\]/,
+        );
       }
-      // The two placeholder sizes are present at all (guards against a vacuous loop).
-      expect(indexSource).toContain("text-[28px]");
-      expect(indexSource).toContain("text-[18px]");
     });
 
-    it("has no font-scaling overrides and no animation APIs or classes", () => {
-      for (const abs of appFiles) {
-        const src = readFileSync(abs, "utf8");
-        const where = toRepoPath(abs);
-        expect(src, where).not.toMatch(/\ballowFontScaling\b/);
-        expect(src, where).not.toMatch(/\bmaxFontSizeMultiplier\b/);
-        expect(src, where).not.toMatch(/\bAnimated\b/);
-        const specs = moduleSpecifiers(src);
+    // Property 5: Font scaling stays on outside Dense_Components (Req 3.4).
+    it("never disables font scaling and caps it only in AppText and the Dense_Components", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      const capped: string[] = [];
+      for (const path of sourcePaths) {
+        const src = read(path);
+        expect(src, `${path} overrides font scaling`).not.toMatch(/\ballowFontScaling\b/);
+        const caps = /\bmaxFontSizeMultiplier\b/.test(src) || /\bdense\b/.test(src);
+        if (caps) capped.push(path);
+        if (!FONT_CAP_FILES.has(path)) {
+          expect(src, `${path} caps font scaling outside a Dense_Component`).not.toMatch(
+            /\bmaxFontSizeMultiplier\b|\bdense\b/,
+          );
+        }
+      }
+      expect(capped.sort()).toEqual([...FONT_CAP_FILES].sort());
+    });
+
+    it("has no animation API, no animation library import and no animation class (Req 8.4)", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      for (const path of sourcePaths) {
+        const src = read(path);
+        expect(src, path).not.toMatch(/\bAnimated\b/);
         expect(
-          specs.filter((s) => /^(?:react-native-reanimated|moti)(?:\/.*)?$/.test(s)),
-          where,
+          moduleSpecifiers(src).filter((s) =>
+            /^(?:react-native-reanimated|moti)(?:\/.*)?$/.test(s),
+          ),
+          path,
         ).toEqual([]);
         for (const value of classNameValues(src)) {
-          expect(value, where).not.toMatch(
+          expect(value, path).not.toMatch(
             /(?<![\w-])(?:animate-[\w-]+|transition(?:-[\w-]+)?)(?![\w-])/,
           );
         }
-        expect(src, where).not.toMatch(/(?<![\w-])(?:animate|transition)-[a-z0-9[]/);
+        expect(src, path).not.toMatch(/(?<![\w-])(?:animate|transition)-[a-z0-9[]/);
       }
+    });
+
+    it("makes no network call and imports no backend client (Req 8.1)", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      for (const path of sourcePaths) {
+        const src = read(path);
+        expect(src, path).not.toMatch(/\bfetch\s*\(/);
+        expect(src, path).not.toMatch(/\bXMLHttpRequest\b/);
+        expect(src, path).not.toMatch(/\bWebSocket\b/);
+        expect(src, path).not.toMatch(/\bEventSource\b/);
+        expect(
+          moduleSpecifiers(src).filter(
+            (s) => s.startsWith("@supabase/") || /^(?:mqtt|ws)(?:\/.*)?$/.test(s),
+          ),
+          path,
+        ).toEqual([]);
+      }
+    });
+
+    it("reads no environment variable (Req 8.2)", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      for (const path of sourcePaths) {
+        expect(findEnvReads(read(path)), path).toEqual([]);
+      }
+    });
+
+    it("imports @xelulu/shared with import type only (Req 8.3)", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      const clauses: string[] = [];
+      for (const path of sourcePaths) {
+        const src = read(path);
+        for (const match of src.matchAll(
+          /\bimport\s+([\s\S]*?)\bfrom\s*(["'`])@xelulu\/shared(?:\/[^"'`]*)?\2/g,
+        )) {
+          const clause = (match[1] ?? "").trim();
+          clauses.push(`${path}: ${clause}`);
+          expect(clause, `${path} imports @xelulu/shared as a value`).toMatch(/^type\b/);
+        }
+      }
+      // At least one such import exists, so the check is not vacuous.
+      expect(clauses.length).toBeGreaterThan(0);
+    });
+
+    /**
+     * Phase 2.2 D3: v1 has no camera at all, so the Device page carries a static row saying so.
+     * These two files are the only ones allowed to hold that label, as non-pressable text; the
+     * module-import ban and the element bans below stay global and are widened, not narrowed.
+     */
+    const CAMERA_LABEL_FILES: ReadonlySet<string> = new Set([
+      "apps/parent-app/src/features/device/strings.ts",
+      "apps/parent-app/src/features/device/device-screen.tsx",
+    ]);
+
+    const DEVICE_STRINGS_FILE = "apps/parent-app/src/features/device/strings.ts";
+    const DEVICE_SCREEN_FILE = "apps/parent-app/src/features/device/device-screen.tsx";
+
+    /**
+     * Every camera, video, picker and persistence module the app may not import.
+     *
+     * The `["'`]Video` ban below is on an opening quote or backtick, so it also catches a
+     * back-quoted mention inside a comment. That is deliberate and it binds: the Reference's
+     * original screen-13 row name is written down in the phase's `design.md` and nowhere in the
+     * app, and the grandma feature's comments name the built row instead (D5).
+     */
+    const BANNED_MODULE =
+      /^(?:expo-(?:camera|video|av|image-picker|media-library|secure-store|file-system)|react-native-vision-camera|@react-native-async-storage\/async-storage)(?:\/.*)?$/;
+
+    it("has no camera or video feature, and the Camera label only in the device feature (Req 8.6)", () => {
+      expect(sourcePaths.length).toBeGreaterThan(20);
+      const cameraLabelFiles: string[] = [];
+      for (const path of sourcePaths) {
+        const src = read(path);
+        expect(
+          moduleSpecifiers(src).filter((s) => BANNED_MODULE.test(s)),
+          path,
+        ).toEqual([]);
+        expect(src, path).not.toMatch(/<Camera(?![\w.])/);
+        expect(src, path).not.toMatch(/<Video(?![\w.])/);
+        expect(src, path).not.toMatch(/\bVideoView\b/);
+        expect(src, path).not.toMatch(/["'`]Video/);
+        if (/["'`]Camera/.test(src)) cameraLabelFiles.push(path);
+      }
+      for (const path of cameraLabelFiles) {
+        expect(CAMERA_LABEL_FILES.has(path), `${path} holds a 'Camera' string literal`).toBe(true);
+      }
+      // At most the two allow-listed files, which holds only because no string outside the
+      // device feature begins with that word (screen 5's photo strings are pinned for it).
+      expect(cameraLabelFiles.length).toBeLessThanOrEqual(CAMERA_LABEL_FILES.size);
+    });
+
+    // The two compensating assertions for the narrowing above (Req 14.4, D3). Neither scans
+    // `device-screen.tsx` for the bare word `Toggle`: the Movement row legitimately renders one
+    // through ListRow's trailing object form.
+    it("the device feature holds the camera row's static text, so the allow-list is not vacuous", () => {
+      expect(sourcePaths).toEqual(
+        expect.arrayContaining([DEVICE_STRINGS_FILE, DEVICE_SCREEN_FILE]),
+      );
+      const src = read(DEVICE_STRINGS_FILE);
+      expect(src).toContain('"Camera"');
+      expect(src).toContain('"Not included on this model"');
+    });
+
+    it("the Device screen's camera row is static text and no control (Req 14.4)", () => {
+      const src = read(DEVICE_SCREEN_FILE);
+      expect(src).not.toMatch(/<Switch(?![\w.])/);
+      expect(src).not.toMatch(/accessibilityRole\s*=\s*\{?\s*["'`]switch/);
+
+      const row = /<ListRow\s+icon="camera-outline"([\s\S]*?)\/>/.exec(src);
+      expect(row, "the camera row element in device-screen.tsx").not.toBeNull();
+      const props = row?.[1] ?? "";
+      expect(props.length).toBeGreaterThan(0);
+      expect(props).toContain('trailing="none"');
+      expect(props).not.toMatch(/\bonPress\b/);
+      expect(props).not.toMatch(/trailing=\{\{\s*toggle/);
+    });
+
+    /** The Route_Table: the one file allowed to write a route path (Phase 2.2 Req 22.9, C10). */
+    const ROUTE_TABLE = "apps/parent-app/src/features/shell/routes.ts";
+
+    /** The sixteen route paths, read off the Route_Table itself so the list cannot drift. */
+    const routePaths: readonly string[] = [
+      ...new Set(scanSource(read(ROUTE_TABLE)).strings.filter((s) => /^\/[a-z][a-z-]*$/.test(s))),
+    ].sort();
+
+    // Property 15: the boundaries hold, statically (Req 22.9, 3.1).
+    it("writes a route path only in the Route_Table", () => {
+      expect(routePaths).toHaveLength(16);
+      expect(routePaths).toEqual(expect.arrayContaining(["/home", "/grandma-mode"]));
+      const routeSet: ReadonlySet<string> = new Set(routePaths);
+      const offenders: string[] = [];
+      for (const path of sourcePaths) {
+        if (path === ROUTE_TABLE) continue;
+        const hits = scanSource(read(path)).strings.filter((s) => routeSet.has(s));
+        if (hits.length > 0) offenders.push(`${path}: ${[...new Set(hits)].join(", ")}`);
+      }
+      expect(
+        offenders,
+        `route paths written outside the Route_Table:\n${offenders.join("\n")}`,
+      ).toEqual([]);
+    });
+
+    /** Every `mock-*.ts` Mock_Module: the app's whole mock world. */
+    const mockModulePaths = sourcePaths.filter((path) => /\/mock-[\w-]+\.ts$/.test(path));
+
+    /**
+     * Fields and shapes a Mock_Module may never carry (Req 19.5, safety.md s.1 and s.7): anything
+     * the child said, anywhere a recording could be found, a raw sensor reading, an email address,
+     * a phone number or a price.
+     */
+    const MOCK_PAYLOAD_BAN = /\b(?:transcript|audio|storage_path|confidence|duration_s)\b/i;
+    const MEDIA_FILE = /\.(?:mp3|wav|opus)\b/i;
+    const CURRENCY = /[$\u20B9\u20AC\u00A3\u00A5]/;
+
+    it("the Mock_Modules carry no transcript, audio, file, address, number or price (Req 19.5)", () => {
+      expect(mockModulePaths.length).toBeGreaterThanOrEqual(10);
+      for (const path of mockModulePaths) {
+        const src = read(path);
+        const { code, strings } = scanSource(src);
+        expect(code, `${path} names a banned payload field`).not.toMatch(MOCK_PAYLOAD_BAN);
+        expect(code, `${path} names a media file`).not.toMatch(MEDIA_FILE);
+        expect(code, `${path} holds a ten-digit run`).not.toMatch(/\d{10}/);
+        // Module specifiers are excluded: `@xelulu/shared` is an import, not a payload. Inside a
+        // template literal `${` is interpolation, not a price.
+        const specifiers: ReadonlySet<string> = new Set(moduleSpecifiers(src));
+        for (const value of strings) {
+          if (specifiers.has(value)) continue;
+          expect(value, `${path} holds an email address`).not.toContain("@");
+          expect(value.replace(/\$\{/g, ""), `${path} holds a currency symbol`).not.toMatch(
+            CURRENCY,
+          );
+        }
+      }
+    });
+
+    /** The two Expo Router layout files: the only route files that compose anything (C10). */
+    const LAYOUT_ROUTE_FILES: ReadonlySet<string> = new Set([
+      "apps/parent-app/app/_layout.tsx",
+      "apps/parent-app/app/(tabs)/_layout.tsx",
+    ]);
+
+    // Property 17: every route file is thin (Req 22.1, 22.2, 22.7, 3.1). A route file renders its
+    // feature screen and nothing else, so a screen can be tested without the router.
+    it("every non-layout route file renders exactly one element", () => {
+      const routeFiles = sourceFiles("apps/parent-app/app")
+        .map(toRepoPath)
+        .filter((path) => path.endsWith(".tsx"))
+        .sort();
+      expect(routeFiles).toHaveLength(19);
+      expect(routeFiles).toEqual(expect.arrayContaining([...LAYOUT_ROUTE_FILES]));
+      for (const path of routeFiles) {
+        if (LAYOUT_ROUTE_FILES.has(path)) continue;
+        const elements = read(path).match(/<[A-Z]/g) ?? [];
+        expect(elements, `${path} composes ${elements.length} elements, not 1`).toHaveLength(1);
+      }
+    });
+
+    // Req 20.2, 20.3: every picture in the app is an original in-repo SVG, and no raster or
+    // third-party art file ships. These two scans are the only checks behind that pair of SHALLs.
+    it("every Illustration carries its licence line and the app ships no raster art", () => {
+      const art = sourceFiles("apps/parent-app/src/illustrations");
+      expect(art.length).toBeGreaterThanOrEqual(5);
+      for (const abs of art) {
+        expect(read(toRepoPath(abs)), toRepoPath(abs)).toContain("Original work, Xelulu-owned");
+      }
+
+      const RASTER = /\.(?:png|jpe?g|gif|webp|bmp|riv|lottie)$/i;
+      const files = walk(join(ROOT, "apps/parent-app")).map(toRepoPath);
+      expect(files.length).toBeGreaterThan(20);
+      expect(files.filter((path) => RASTER.test(path))).toEqual([]);
     });
   });
 
@@ -210,16 +555,29 @@ describe("placeholder screens and package boundaries", () => {
       }
     });
 
-    it.each(["services/gateway/src", "services/simulator/src"])(
-      "%s imports no network modules",
+    it.each(Object.keys(TRANSPORT_DIRS))(
+      "%s imports network modules only in its transport folders",
       (dir) => {
+        const transportDirs = TRANSPORT_DIRS[dir] ?? [];
+        expect(transportDirs).toHaveLength(3);
+
+        // Each allowed folder exists and holds at least one .ts file, so the allowance is real.
+        for (const transportDir of transportDirs) {
+          const abs = join(ROOT, transportDir);
+          expect(existsSync(abs) && statSync(abs).isDirectory(), transportDir).toBe(true);
+          const tsFiles = walk(abs).filter((f) => extname(f) === ".ts");
+          expect(tsFiles.length, `${transportDir} has no .ts file`).toBeGreaterThan(0);
+        }
+
         const files = sourceFiles(dir);
         expect(files.length).toBeGreaterThan(0);
         for (const abs of files) {
+          const where = toRepoPath(abs);
+          if (transportDirs.some((t) => where.startsWith(`${t}/`))) continue;
           const bad = moduleSpecifiers(readFileSync(abs, "utf8")).filter((s) =>
             NETWORK_MODULE_RE.test(s),
           );
-          expect(bad, toRepoPath(abs)).toEqual([]);
+          expect(bad, `${where} imports a network module outside a transport folder`).toEqual([]);
         }
       },
     );

@@ -1,0 +1,8 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400013,
+  "type": "event",
+  "event_id": "ev_button_01",
+  "event": "button",
+  "data": { "button": "belly_talk", "action": "press" }
+}

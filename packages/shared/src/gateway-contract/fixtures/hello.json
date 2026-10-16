@@ -1,0 +1,9 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400000,
+  "type": "hello",
+  "device_id": "xlu_000123",
+  "fw_ver": "0.1.0",
+  "auth": "<device token>",
+  "proto": 2
+}

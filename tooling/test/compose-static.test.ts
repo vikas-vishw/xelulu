@@ -1,6 +1,12 @@
-// Static checks for the local Compose stack (Req 10.1, 10.2, 10.3, 10.4, 10.5, 10.11, 10.12, 10.13).
+// Static checks for the local Compose stack (Req 10.1, 10.2, 10.3, 10.4, 10.5, 10.11, 10.12, 10.13;
+// Phase 1.3 Req 3.3, 3.4, 9.1).
 // Parses `docker-compose.yml` with `yaml` (the raw text is kept for the credentials comment) and
 // reads the gateway and simulator Dockerfiles' FROM lines to check the Node major against `.nvmrc`.
+//
+// It also pins `.env.local.example`, the tracked dev-only copy of the same Local_Mode values, to
+// the Compose defaults below. Secret_Check allows those nine keys to carry a value in exactly
+// those two files, so this is where what the values ARE is checked: a real credential pasted
+// into either file fails here.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,10 +16,122 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const COMPOSE_PATH = join(ROOT, "docker-compose.yml");
+const LOCAL_ENV_PATH = join(ROOT, ".env.local.example");
 
 const EXPECTED_SERVICES = ["emqx", "gateway", "simulator"];
 const EMQX_PORTS = [1883, 8883, 8083, 8084, 18083];
 const NODE_SERVICES = ["gateway", "simulator"] as const;
+// Phase 1.3 Req 3.3 and 3.4 (C8, C9): one host-loopback port each, raw YAML text before interpolation.
+const NODE_SERVICE_PORTS: Record<(typeof NODE_SERVICES)[number], string> = {
+  gateway: "127.0.0.1:${GATEWAY_OPERATOR_PORT:-8090}:${GATEWAY_OPERATOR_PORT:-8090}",
+  simulator: "127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}",
+};
+// Req 21.7: each service's exact `command`. The gateway also carries the Transcripts_Argument, so
+// the local stack's operator channel shows transcript text (Local_Mode only); the simulator does
+// not take that argument.
+const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly string[]> = {
+  gateway: ["node", "dist/index.js", "--listen-all-interfaces", "--operator-transcripts"],
+  simulator: ["node", "dist/index.js", "--listen-all-interfaces"],
+};
+
+// Each service's `environment:` block, as [G3 key, local default] in file order. `null` means the
+// bare `${KEY}` form with no default: Compose must never supply a broker credential, and empty is
+// the correct Local_Mode value. Written as tuples rather than a literal map so no line in this
+// test file is a Panel_Key assignment (Secret_Check scans it).
+type EnvEntry = readonly [key: string, fallback: string | null];
+const DEVICE_TOKEN_DEFAULT = "dev_local_only_not_a_secret";
+const SHARED_SERVICE_ENV: readonly EnvEntry[] = [
+  ["APP_ENV", "local"],
+  ["MQTT_BROKER_URL", "mqtt://emqx:1883"],
+  ["MQTT_USERNAME", null],
+  ["MQTT_PASSWORD", null],
+  ["AUDIO_WSS_URL", "ws://gateway:8081"],
+  ["DEVICE_ID", "xlu_000123"],
+  ["DEVICE_TOKEN", DEVICE_TOKEN_DEFAULT],
+];
+const NODE_SERVICE_ENV: Record<(typeof NODE_SERVICES)[number], readonly EnvEntry[]> = {
+  gateway: [...SHARED_SERVICE_ENV, ["GATEWAY_OPERATOR_PORT", "8090"]],
+  simulator: [...SHARED_SERVICE_ENV, ["SIMULATOR_PANEL_PORT", "8091"]],
+};
+
+/** `${KEY:-default}`, or the bare `${KEY}` when there is no default. */
+function envRef([key, fallback]: EnvEntry): string {
+  return fallback === null ? "${" + key + "}" : "${" + key + ":-" + fallback + "}";
+}
+
+/** The raw, pre-interpolation `environment` mapping the file must carry for a service. */
+function expectedEnvironment(name: (typeof NODE_SERVICES)[number]): Record<string, string> {
+  return Object.fromEntries(NODE_SERVICE_ENV[name].map((e) => [e[0], envRef(e)]));
+}
+
+/**
+ * What `.env.local.example` must assign: every key both services declare, with the Compose
+ * default as its value (the bare-reference keys mean no value, so empty). Derived from the same
+ * tuples the Compose assertions use, so the two files cannot drift apart.
+ */
+function expectedLocalEnv(): ReadonlyMap<string, string> {
+  const expected = new Map<string, string>();
+  for (const name of NODE_SERVICES) {
+    for (const [key, fallback] of NODE_SERVICE_ENV[name]) expected.set(key, fallback ?? "");
+  }
+  return expected;
+}
+
+/**
+ * `KEY=value` lines of a dotenv file, in order. Blank and comment lines are skipped; any other
+ * line that is not an assignment fails the parse, so nothing can hide in this file.
+ */
+function parseEnvFile(text: string): readonly (readonly [string, string])[] {
+  const out: (readonly [string, string])[] = [];
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (match?.[1] === undefined) {
+      throw new Error(`.env.local.example line ${i + 1} is neither a comment nor an assignment`);
+    }
+    out.push([match[1], (match[2] ?? "").trim()]);
+  }
+  return out;
+}
+
+// Each service's own CLI over loopback: no curl, no wget, no added dependency.
+const NODE_SERVICE_HEALTHCHECK: Record<(typeof NODE_SERVICES)[number], unknown> = {
+  gateway: {
+    test: ["CMD", "node", "dist/cli.js", "devices"],
+    interval: "10s",
+    timeout: "10s",
+    retries: 6,
+    start_period: "60s",
+  },
+  simulator: {
+    test: ["CMD", "node", "dist/cli.js", "state"],
+    interval: "10s",
+    timeout: "10s",
+    retries: 6,
+    start_period: "60s",
+  },
+};
+
+/** Every key a Node service may carry, sorted. Each one is pinned by its own assertion below. */
+const NODE_SERVICE_KEYS: readonly string[] = [
+  "build",
+  "command",
+  "depends_on",
+  "env_file",
+  "environment",
+  "healthcheck",
+  "ports",
+  "restart",
+];
+
+const HEALTHY = { condition: "service_healthy" };
+// The simulator waits for a healthy gateway, so the gateway is subscribed before the hello.
+const NODE_SERVICE_DEPENDS_ON: Record<(typeof NODE_SERVICES)[number], unknown> = {
+  gateway: { emqx: HEALTHY },
+  simulator: { emqx: HEALTHY, gateway: HEALTHY },
+};
 
 type ComposeService = Record<string, unknown>;
 
@@ -65,11 +183,22 @@ describe("docker-compose.yml (static)", () => {
     expect([...(ports as unknown[])].map(String).sort()).toEqual([...expected].sort());
   });
 
-  it("has no environment entries on any service", () => {
+  it("publishes every port on host 127.0.0.1, never on 0.0.0.0 or without a host IP", () => {
     for (const [name, svc] of Object.entries(compose.services)) {
-      expect(svc, `service ${name}`).not.toHaveProperty("environment");
+      if (svc.ports === undefined) continue;
+      expect(Array.isArray(svc.ports), `service ${name} ports`).toBe(true);
+      for (const entry of svc.ports as unknown[]) {
+        const text = typeof entry === "string" ? entry : JSON.stringify(entry);
+        expect(text.startsWith("127.0.0.1:"), `service ${name} port "${text}"`).toBe(true);
+        expect(text, `service ${name} port "${text}"`).not.toContain("0.0.0.0");
+      }
     }
-    expect(rawCompose).not.toMatch(/^\s*environment\s*:/m);
+  });
+
+  it("has an environment block on the two Node services only", () => {
+    expect(service("emqx"), "service emqx").not.toHaveProperty("environment");
+    // Exactly two `environment:` keys in the raw text, so no third block can slip in.
+    expect(rawCompose.match(/^\s*environment\s*:/gm) ?? []).toHaveLength(2);
   });
 
   it("carries a comment saying the default dashboard credentials are for local development only", () => {
@@ -99,12 +228,67 @@ describe("docker-compose.yml (static)", () => {
       expect(service(name).restart).toBe("no");
     });
 
-    it("publishes no ports and carries no environment or credentials", () => {
-      const svc = service(name);
-      expect(svc).not.toHaveProperty("ports");
-      expect(svc).not.toHaveProperty("environment");
-      expect(svc).not.toHaveProperty("secrets");
-      expect(JSON.stringify(svc)).not.toMatch(/password|passwd|secret|token|credential/i);
+    it("publishes exactly its one loopback-only port", () => {
+      const ports = service(name).ports;
+      expect(ports).toEqual([NODE_SERVICE_PORTS[name]]);
+      for (const entry of ports as unknown[]) {
+        expect(String(entry).startsWith("127.0.0.1:"), `port "${String(entry)}"`).toBe(true);
+      }
+    });
+
+    it("runs the image's default command plus its own listen arguments", () => {
+      expect(service(name).command).toEqual(NODE_SERVICE_COMMAND[name]);
+    });
+
+    it("uses no Compose secrets", () => {
+      expect(service(name)).not.toHaveProperty("secrets");
+    });
+
+    // Every key below is pinned exactly by the assertions in this block, so pinning the key SET
+    // closes the file off: a `volumes`, `labels` or `extra_hosts` entry — any new key at all,
+    // credential text or not — fails here until it is reviewed and added deliberately.
+    it("carries exactly these eight keys and no other", () => {
+      expect(Object.keys(service(name)).sort()).toEqual(NODE_SERVICE_KEYS);
+    });
+
+    it("carries exactly its own eight G3 keys as local defaults, in order", () => {
+      const env = service(name).environment;
+      expect(env).toEqual(expectedEnvironment(name));
+      expect(Object.keys(env as Record<string, string>)).toEqual(
+        NODE_SERVICE_ENV[name].map((e) => e[0]),
+      );
+    });
+
+    it("writes every value as a reference to its own key, so no literal is pasted in", () => {
+      const env = service(name).environment as Record<string, string>;
+      for (const [key, value] of Object.entries(env)) {
+        // `${KEY}` or `${KEY:-default}`, and never some other key's name.
+        expect(value, `${name}.environment.${key}`).toMatch(
+          new RegExp(`^\\$\\{${key}(?::-[^}]*)?\\}$`),
+        );
+      }
+    });
+
+    it("supplies no broker credential: both MQTT credential keys are bare references", () => {
+      const env = service(name).environment as Record<string, string>;
+      for (const key of ["MQTT_USERNAME", "MQTT_PASSWORD"]) {
+        expect(env[key], `${name}.environment.${key}`).toBe("${" + key + "}");
+      }
+    });
+
+    it("defaults the device token to an unmistakable dev placeholder", () => {
+      const env = service(name).environment as Record<string, string>;
+      expect(env["DEVICE_TOKEN"]).toBe("${DEVICE_TOKEN:-" + DEVICE_TOKEN_DEFAULT + "}");
+      expect(DEVICE_TOKEN_DEFAULT).toMatch(/dev/);
+      expect(DEVICE_TOKEN_DEFAULT).toMatch(/not_a_secret/);
+    });
+
+    it("health-checks itself with its own CLI over loopback", () => {
+      expect(service(name).healthcheck).toEqual(NODE_SERVICE_HEALTHCHECK[name]);
+    });
+
+    it("waits for the services it needs to be healthy", () => {
+      expect(service(name).depends_on).toEqual(NODE_SERVICE_DEPENDS_ON[name]);
     });
 
     it("uses a Node base image whose major matches .nvmrc", () => {
@@ -116,5 +300,43 @@ describe("docker-compose.yml (static)", () => {
         expect(Number(match?.[1])).toBe(nvmrcMajor());
       }
     });
+  });
+});
+
+describe(".env.local.example (static)", () => {
+  const rawLocalEnv = readFileSync(LOCAL_ENV_PATH, "utf8");
+  const entries = parseEnvFile(rawLocalEnv);
+  const values = new Map(entries);
+
+  it("is marked dev-only, and says the one guarded panel is .env.example", () => {
+    const comments = rawLocalEnv
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("#"));
+    expect(comments.some((line) => /dev-only/i.test(line))).toBe(true);
+    expect(comments.some((line) => line.includes(".env.example"))).toBe(true);
+  });
+
+  it("assigns exactly the nine Local_Mode keys, once each", () => {
+    expect(entries.map(([key]) => key).sort()).toEqual([...expectedLocalEnv().keys()].sort());
+    expect(values.size).toBe(entries.length);
+  });
+
+  it("carries the same value for every key as the Compose default", () => {
+    for (const [key, expected] of expectedLocalEnv()) {
+      expect(values.get(key), `.env.local.example ${key}`).toBe(expected);
+    }
+  });
+
+  it("supplies no broker credential: both MQTT credential keys are empty", () => {
+    for (const key of ["MQTT_USERNAME", "MQTT_PASSWORD"]) {
+      expect(values.get(key), `.env.local.example ${key}`).toBe("");
+    }
+  });
+
+  it("holds an unmistakable dev placeholder, not a real token", () => {
+    expect(values.get("DEVICE_TOKEN")).toBe(DEVICE_TOKEN_DEFAULT);
+    expect(DEVICE_TOKEN_DEFAULT).toMatch(/dev/);
+    expect(DEVICE_TOKEN_DEFAULT).toMatch(/not_a_secret/);
   });
 });

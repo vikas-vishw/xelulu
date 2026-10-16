@@ -1,0 +1,8 @@
+// Fixture for tooling/test/service-sources.test.ts: one example of each banned pattern.
+// Not source code; never compiled, linted or formatted.
+import { writeFile as save } from "node:fs/promises";
+fs.promises.appendFile(target, data);
+mkdirSync(folder);
+console.log(entry);
+process.stdout.write(line);
+process.stderr.write(line);

@@ -1,0 +1,179 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Add dependencies, Jest config and light theme": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572006
+      },
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707610157
+      },
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707733599
+      }
+    ],
+    "1.2 Update `tooling/test/manifests.test.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572113
+      }
+    ],
+    "2.1 Add `src/theme/tokens.json` and `src/theme/theme.ts`, and rewrite `tailwind.config.js`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572196
+      }
+    ],
+    "2.2 Update `tooling/test/contrast.test.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572357
+      }
+    ],
+    "3.1 Add the primitives in `src/components/`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572430
+      }
+    ],
+    "3.2 Add the layout and dense components": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572521
+      }
+    ],
+    "3.3 Write `apps/parent-app/test/components.test.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572611
+      }
+    ],
+    "4.1 Add `src/features/shell/routes.ts` and `strings.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572696
+      },
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707610610
+      },
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707734457
+      }
+    ],
+    "4.2 Add `src/components/screen-header.tsx` and `placeholder-screen.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572770
+      }
+    ],
+    "4.3 Replace the route files": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572857
+      }
+    ],
+    "4.4 Update `tooling/test/layout.test.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707572941
+      }
+    ],
+    "5. Checkpoint": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573021
+      }
+    ],
+    "6.1 Add `src/character/character-placeholder.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573102
+      }
+    ],
+    "6.2 Add `src/features/home/mock-home.ts`, `greeting.ts`, `strings.ts` and `story-thumbnail.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573189
+      }
+    ],
+    "6.3 Add `src/features/home/home-dashboard.tsx` and `app/(tabs)/home.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573277
+      }
+    ],
+    "6.4 Write `test/greeting.test.ts` and `test/home-dashboard.test.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573357
+      }
+    ],
+    "6.5 Write `test/navigation.test.tsx`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573435
+      }
+    ],
+    "7.1 Replace the \"parent app\" block in `tooling/test/placeholder.test.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573519
+      }
+    ],
+    "8.1 Write `apps/parent-app/docs/design-system.md`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573653
+      }
+    ],
+    "8.2 Update the root README and `tooling/test/readme.test.ts`": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573764
+      }
+    ],
+    "9.1 Run the full verification": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707573921
+      }
+    ],
+    "9.2 Write the Done-when report": [
+      {
+        "executionId": "0fafe200-0775-4e69-a080-73dc0459195d",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791707574071
+      }
+    ]
+  }
+}

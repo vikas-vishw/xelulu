@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_play_01",
+  "action": "play",
+  "data": { "content_id": "story_042", "source": "cache" }
+}

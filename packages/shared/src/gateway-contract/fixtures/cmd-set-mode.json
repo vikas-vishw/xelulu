@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_set_mode_01",
+  "action": "set_mode",
+  "data": { "mode": "story" }
+}

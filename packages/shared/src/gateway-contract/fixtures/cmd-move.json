@@ -1,0 +1,11 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_move_01",
+  "action": "move",
+  "data": {
+    "cmd": "come",
+    "linear_mms": 150,
+    "angular_mrad_s": 0,
+    "max_dist_mm": 2000
+  }
+}

@@ -1,18 +1,28 @@
-// Simulator start-up checks (Req 7.3, 7.6, 7.7).
-// The helper below is duplicated in services/gateway/test/start.test.ts on purpose:
+// Simulator start-up checks (Req 1.3, 1.4, 1.7, 22.3; design "Start tests").
+// Every case of the design's table runs under both `node dist/index.js` and `pnpm --silent start`
+// and must exit non-zero within 5 s, write only its config error line naming exactly the expected
+// keys (taken from the test's own G3 table in support/env-cases.ts) to stderr, write nothing to
+// stdout and print no sentinel or other scanned value.
+// The runners are duplicated in services/gateway/test/start.test.ts on purpose:
 // services never import each other (dependency-direction rule).
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
+import {
+  configErrorLine,
+  leakValues,
+  panelKeys,
+  pinnedEnv,
+  SENTINEL,
+  startCases,
+  type Env,
+} from "./support/env-cases.js";
+
 const PACKAGE_DIR = fileURLToPath(new URL("..", import.meta.url));
-const PANEL_FIXTURE = fileURLToPath(
-  new URL("../../../tooling/fixtures/approved-panel.txt", import.meta.url),
-);
-const SENTINEL = "xelulu-test-sentinel";
 const TIME_LIMIT_MS = 5000;
 
 interface RunResult {
@@ -20,33 +30,6 @@ interface RunResult {
   stderr: string;
   status: number | null;
   durationMs: number;
-}
-
-type Env = Record<string, string | undefined>;
-
-/** Panel_Keys derived from the approved panel fixture, never hard-coded. */
-function panelKeys(): string[] {
-  const text = readFileSync(PANEL_FIXTURE, "utf8");
-  return text
-    .split(/\r?\n/)
-    .filter((line) => /^[A-Z_][A-Z0-9_]*=/.test(line))
-    .map((line) => line.slice(0, line.indexOf("=")));
-}
-
-function envWithoutPanelKeys(keys: readonly string[]): Env {
-  const env: Env = { ...process.env };
-  // Windows env names are case-insensitive, so match case-insensitively.
-  const upper = new Set(keys.map((k) => k.toUpperCase()));
-  for (const name of Object.keys(env)) {
-    if (upper.has(name.toUpperCase())) delete env[name];
-  }
-  return env;
-}
-
-function envWithSentinels(keys: readonly string[]): Env {
-  const env = envWithoutPanelKeys(keys);
-  for (const key of keys) env[key] = SENTINEL;
-  return env;
 }
 
 /** Runs `node dist/index.js` directly with the current Node binary. */
@@ -84,41 +67,39 @@ function runPnpmStart(cwd: string, env: Env): RunResult {
   };
 }
 
-function expectOk(result: RunResult): void {
-  expect(result.stdout).toBe("ok\n");
-  expect(result.stderr).toBe("");
-  expect(result.status).toBe(0);
-  expect(result.durationMs).toBeLessThan(TIME_LIMIT_MS);
-}
-
-const keys = panelKeys();
-const envVariants: ReadonlyArray<readonly [string, () => Env]> = [
-  ["the current env", () => ({ ...process.env })],
-  ["every Panel_Key removed", () => envWithoutPanelKeys(keys)],
-  ["every Panel_Key set to a sentinel", () => envWithSentinels(keys)],
-];
 const runners: ReadonlyArray<readonly [string, (cwd: string, env: Env) => RunResult]> = [
   ["node dist/index.js", runNode],
   ["pnpm --silent start", runPnpmStart],
 ];
 
+const cases = startCases();
+
 describe("simulator start", () => {
-  it("derives a non-empty Panel_Key list from the fixture", () => {
-    expect(keys.length).toBeGreaterThan(0);
+  it("covers every Panel_Key, including both local port keys", () => {
+    const keys = panelKeys();
+    expect(keys).toContain("GATEWAY_OPERATOR_PORT");
+    expect(keys).toContain("SIMULATOR_PANEL_PORT");
+    expect(cases.length).toBeGreaterThanOrEqual(14);
   });
 
-  describe.each(runners)("%s", (_name, run) => {
-    it.each(envVariants)("prints ok and exits 0 with %s", (_label, makeEnv) => {
-      expectOk(run(PACKAGE_DIR, makeEnv()));
-    });
+  describe.each(runners)("%s", (_runner, run) => {
+    it.each(cases.map((c) => [c.name, c] as const))(
+      "refuses to start with %s",
+      (_name, startCase) => {
+        const result = run(PACKAGE_DIR, pinnedEnv(startCase.entries));
 
-    it("has an identical outcome across all env variants", () => {
-      const outcomes = envVariants.map(([, makeEnv]) => {
-        const { stdout, stderr, status } = run(PACKAGE_DIR, makeEnv());
-        return { stdout, stderr, status };
-      });
-      for (const outcome of outcomes) expect(outcome).toEqual(outcomes[0]);
-    });
+        expect(result.status).not.toBeNull();
+        expect(result.status).not.toBe(0);
+        expect(result.durationMs).toBeLessThan(TIME_LIMIT_MS);
+        expect(result.stdout).toBe("");
+        expect(result.stderr).toContain(configErrorLine(startCase.expectedKeys));
+
+        for (const value of [SENTINEL, ...leakValues(startCase.entries)]) {
+          expect(result.stdout, "stdout leaks a value").not.toContain(value);
+          expect(result.stderr, "stderr leaks a value").not.toContain(value);
+        }
+      },
+    );
   });
 
   describe("without a build", () => {

@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_gesture_01",
+  "action": "gesture",
+  "data": { "name": "wave" }
+}

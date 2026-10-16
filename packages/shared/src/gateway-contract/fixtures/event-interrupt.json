@@ -1,0 +1,8 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400015,
+  "type": "event",
+  "event_id": "ev_interrupt_01",
+  "event": "interrupt",
+  "data": {}
+}

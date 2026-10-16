@@ -1,0 +1,148 @@
+{
+  "fixtures": [
+    {
+      "file": "hello.json",
+      "source": "Document B v2 §3.1",
+      "provenance": "derived",
+      "note": "v2 example + ts added per envelope rule (ruling 1)"
+    },
+    {
+      "file": "status.json",
+      "source": "Document B v2 §3.2",
+      "provenance": "derived",
+      "note": "copied verbatim from Document B v2 §3.2"
+    },
+    {
+      "file": "event-touch.json",
+      "source": "Document B v2 §3.3",
+      "provenance": "derived",
+      "note": "copied verbatim from Document B v2 §3.3"
+    },
+    {
+      "file": "audio-start.json",
+      "source": "Document B v2 §3.4",
+      "provenance": "derived",
+      "note": "copied verbatim from Document B v2 §3.4"
+    },
+    {
+      "file": "audio-end.json",
+      "source": "Document B v2 §3.4",
+      "provenance": "derived",
+      "note": "copied verbatim from Document B v2 §3.4"
+    },
+    {
+      "file": "cmd-say.json",
+      "source": "Document B v2 §4.1",
+      "provenance": "derived",
+      "note": "copied verbatim from Document B v2 §4.1"
+    },
+    {
+      "file": "ack.json",
+      "source": "Document B v2 §5",
+      "provenance": "derived",
+      "note": "v2 example + ts added per envelope rule (ruling 1)"
+    },
+    {
+      "file": "event-wake.json",
+      "source": "Document B v2 §3.3 (wake row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-cry.json",
+      "source": "Document B v2 §3.3 (cry row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-motion.json",
+      "source": "Document B v2 §3.3 (motion row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-button.json",
+      "source": "Document B v2 §3.3 (button row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-nfc.json",
+      "source": "Document B v2 §3.3 (nfc row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-interrupt.json",
+      "source": "Document B v2 §3.3 (interrupt row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "event-error.json",
+      "source": "Document B v2 §3.3 (error row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-animate.json",
+      "source": "Document B v2 §4 (animate row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-gesture.json",
+      "source": "Document B v2 §4 (gesture row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-move.json",
+      "source": "Document B v2 §4 (move row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-play.json",
+      "source": "Document B v2 §4 (play row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-set-mode.json",
+      "source": "Document B v2 §4 (set_mode row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-led.json",
+      "source": "Document B v2 §4 (led row; color format per ruling 2)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-volume.json",
+      "source": "Document B v2 §4 (volume row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-config.json",
+      "source": "Document B v2 §4 (config row; quiet_hours format per ruling 2)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-stop-audio.json",
+      "source": "Document B v2 §4 (stop_audio row)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    },
+    {
+      "file": "cmd-ota.json",
+      "source": "Document B v2 §4.2 (shape; placeholder host replaced)",
+      "provenance": "constructed",
+      "note": "constructed from Document B field tables; not verbatim"
+    }
+  ]
+}

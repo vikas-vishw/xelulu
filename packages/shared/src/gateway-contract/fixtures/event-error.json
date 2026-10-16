@@ -1,0 +1,8 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400016,
+  "type": "event",
+  "event_id": "ev_error_01",
+  "event": "error",
+  "data": { "code": "imu_timeout", "detail": "no IMU reading" }
+}

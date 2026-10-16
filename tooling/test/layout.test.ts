@@ -123,9 +123,38 @@ describe("repo layout", () => {
     });
   });
 
-  describe("parent app routes (Req 4.4)", () => {
-    it("apps/parent-app/app holds only _layout.tsx and index.tsx", () => {
-      expect(entries("apps/parent-app/app")).toEqual(["_layout.tsx", "index.tsx"]);
+  describe("parent app routes (Phase 2.1 Req 10.1, C10)", () => {
+    /** Exactly the C10 route files, recursive under apps/parent-app/app, sorted. */
+    const C10_ROUTE_FILES = [
+      "(onboarding)/auth.tsx",
+      "(onboarding)/child-profile.tsx",
+      "(onboarding)/onboarding.tsx",
+      "(onboarding)/pair-device.tsx",
+      "(tabs)/_layout.tsx",
+      "(tabs)/family.tsx",
+      "(tabs)/grow.tsx",
+      "(tabs)/home.tsx",
+      "(tabs)/play.tsx",
+      "(tabs)/routines.tsx",
+      "_layout.tsx",
+      "device.tsx",
+      // Phase 2.2 adds the Grandma Mode Stack_Route (D2).
+      "grandma-mode.tsx",
+      "index.tsx",
+      "notifications.tsx",
+      "privacy.tsx",
+      // Phase 2.2 adds the Reports Stack_Route (D2).
+      "reports.tsx",
+      "settings.tsx",
+      "voice-call.tsx",
+    ] as const;
+
+    it("apps/parent-app/app holds exactly the C10 route files", () => {
+      const appDir = join(ROOT, "apps/parent-app/app");
+      const found = walkFiles(appDir)
+        .map((file) => toPosix(relative(appDir, file)))
+        .sort();
+      expect(found).toEqual([...C10_ROUTE_FILES].sort());
     });
   });
 
@@ -136,16 +165,34 @@ describe("repo layout", () => {
     });
   });
 
-  describe("shared placeholder folders (Req 8.4, 8.5, 8.6)", () => {
+  describe("shared contract and domain folders (Phase 1 Req 17.4)", () => {
     it("gateway-contract and domain are separate folders under shared src/", () => {
       const src = entries("packages/shared/src");
       expect(src).toContain("gateway-contract");
       expect(src).toContain("domain");
     });
 
+    it("gateway-contract holds .ts sources and fixtures/manifest.json", () => {
+      const dir = "packages/shared/src/gateway-contract";
+      expect(
+        entries(dir).some((n) => n.endsWith(".ts")),
+        `${dir} has .ts sources`,
+      ).toBe(true);
+      expect(isDir(join(ROOT, dir, "fixtures")), `${dir}/fixtures is a folder`).toBe(true);
+      expect(isFile(join(ROOT, dir, "fixtures", "manifest.json")), "fixture manifest").toBe(true);
+    });
+
+    it("domain holds .ts sources", () => {
+      const dir = "packages/shared/src/domain";
+      expect(
+        entries(dir).some((n) => n.endsWith(".ts")),
+        `${dir} has .ts sources`,
+      ).toBe(true);
+    });
+
     it.each(["packages/shared/src/gateway-contract", "packages/shared/src/domain"])(
-      "%s holds exactly one zero-byte .gitkeep",
-      (dir) => expectOnlyEmptyGitkeep(dir),
+      "%s has no .gitkeep",
+      (dir) => expect(entries(dir)).not.toContain(".gitkeep"),
     );
   });
 

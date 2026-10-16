@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xelulu simulator panel</title>
+    <link rel="stylesheet" href="panel.css" />
+    <script type="module" src="panel.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Xelulu simulator panel</h1>
+      <p>Drives the local fake robot only. Lists come from the simulator itself.</p>
+
+      <section aria-labelledby="result-heading">
+        <h2 id="result-heading">Last result</h2>
+        <output id="result" aria-live="polite">Loading state.</output>
+      </section>
+
+      <form id="events-form" aria-labelledby="events-heading">
+        <h2 id="events-heading">Events</h2>
+        <fieldset>
+          <legend>Touch</legend>
+          <div class="field">
+            <label for="touch-gesture">Gesture</label>
+            <select id="touch-gesture" name="gesture"></select>
+          </div>
+          <div id="touch-zones" class="buttons" role="group" aria-label="Touch zones"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Any event</legend>
+          <div class="field">
+            <label for="event-kind">Event kind</label>
+            <select id="event-kind" name="event"></select>
+          </div>
+          <div class="field">
+            <label for="event-data">Data as JSON (optional, defaults fill omitted fields)</label>
+            <input id="event-data" name="data" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="buttons">
+            <button type="submit" name="fire" value="kind">Fire event</button>
+          </div>
+        </fieldset>
+      </form>
+
+      <form id="audio-form" aria-labelledby="audio-heading">
+        <h2 id="audio-heading">Audio turn</h2>
+        <div class="field">
+          <label for="utterance">Utterance</label>
+          <select id="utterance" name="utterance">
+            <option value="">synthetic frames</option>
+          </select>
+        </div>
+        <div class="buttons">
+          <button type="submit">Start audio turn</button>
+        </div>
+      </form>
+
+      <form id="connection-form" aria-labelledby="connection-heading">
+        <h2 id="connection-heading">Connection</h2>
+        <div class="buttons">
+          <button type="submit" name="online" value="false">Go offline</button>
+          <button type="submit" name="online" value="true">Go online</button>
+        </div>
+      </form>
+
+      <form id="duplicate-form" aria-labelledby="duplicate-heading">
+        <h2 id="duplicate-heading">Duplicate replay</h2>
+        <div class="field check">
+          <input id="duplicate-enabled" name="enabled" type="checkbox" />
+          <label for="duplicate-enabled"
+            >Re-publish the last 5 events after going back online</label
+          >
+        </div>
+        <div class="buttons">
+          <button type="submit">Apply duplicate replay</button>
+        </div>
+      </form>
+
+      <form id="ack-form" aria-labelledby="ack-heading">
+        <h2 id="ack-heading">Ack policy</h2>
+        <div class="field">
+          <label for="ack-scope">Scope</label>
+          <select id="ack-scope" name="scope">
+            <option value="all">all actions</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ack-mode">Override</label>
+          <select id="ack-mode" name="mode">
+            <option value="reject">reject</option>
+            <option value="fail">fail</option>
+            <option value="accept_only">accept only</option>
+            <option value="silent">silent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ack-reason">Reason (reject needs one; fail allows none)</label>
+          <select id="ack-reason" name="reason">
+            <option value="">none</option>
+          </select>
+        </div>
+        <div class="buttons">
+          <button type="submit" name="op" value="set">Set override</button>
+          <button type="submit" name="op" value="clear">Clear override for scope</button>
+        </div>
+      </form>
+
+      <form id="battery-form" aria-labelledby="battery-heading">
+        <h2 id="battery-heading">Battery</h2>
+        <div class="field">
+          <label for="battery-pct">Battery percent</label>
+          <input id="battery-pct" name="battery_pct" type="number" step="1" inputmode="numeric" />
+        </div>
+        <div class="field check">
+          <input id="battery-charging" name="charging" type="checkbox" />
+          <label for="battery-charging">Charging</label>
+        </div>
+        <div class="buttons">
+          <button type="submit">Set battery</button>
+        </div>
+      </form>
+
+      <form id="state-form" aria-labelledby="state-heading">
+        <h2 id="state-heading">State</h2>
+        <div class="buttons">
+          <button type="submit">Refresh state</button>
+        </div>
+        <pre id="state-view"></pre>
+      </form>
+    </main>
+  </body>
+</html>

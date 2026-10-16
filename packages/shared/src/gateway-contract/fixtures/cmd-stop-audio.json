@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_stop_audio_01",
+  "action": "stop_audio",
+  "data": {}
+}

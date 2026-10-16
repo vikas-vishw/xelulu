@@ -1,0 +1,9 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400001,
+  "type": "event",
+  "event_id": "ev_7f3a",
+  "event": "touch",
+  "time_uncertain": false,
+  "data": { "zone": "belly", "gesture": "double_tap" }
+}

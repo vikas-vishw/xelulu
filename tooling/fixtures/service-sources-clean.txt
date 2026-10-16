@@ -1,0 +1,12 @@
+// Fixture for tooling/test/service-sources.test.ts: reads files and writes through a sink only.
+// Not source code; never compiled, linted or formatted.
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+const text = readFileSync(target, "utf8");
+const other = await readFile(target, "utf8");
+sink.writeLine(json);
+logger.write(entry);
+const consoleLike = { log() {} };
+consoleLike.log(entry);
+myprocess.stdout.write(line);
+const renamedTable = renameMap;

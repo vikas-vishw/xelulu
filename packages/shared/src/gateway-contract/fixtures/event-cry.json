@@ -1,0 +1,8 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400011,
+  "type": "event",
+  "event_id": "ev_cry_01",
+  "event": "cry",
+  "data": { "confidence": 0.87, "duration_s": 6.5 }
+}

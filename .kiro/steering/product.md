@@ -131,6 +131,7 @@ The face is a 2.8" IPS panel behind smoked plastic. It shows no video, apps, tex
 ## How we work
 - Omar (founder) approves everything.
 - Claude is CTO/PM.
-- The intern owns firmware and hardware.
+- The intern owns firmware and hardware, and does no work until Phase 6. Nobody and nothing in Phases 1.2 through 5 waits on the intern. Every hardware-facing choice is CTO-decided and final; at Phase 6 the firmware is built to match our contract, never the reverse.
 - Kiro is the implementation engineer.
 - One spec at a time. No code before its spec is approved. Follow phases 0–7 of the Master Build Guide.
+- Goal before Phase 6: a complete, working software product built solo and proven against the simulator. That means the full parent app exactly as the frozen 16-screen UI reference (`docs/design/Xelulu Parent App UX Flow-4.png`), plus the admin console, the cloud, the brain, content and safety. At Phase 6 the whole system already works end-to-end; the intern's only job is to make the real hardware behave like the simulator already does.

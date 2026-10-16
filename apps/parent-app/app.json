@@ -3,7 +3,7 @@
     "name": "Xelulu",
     "slug": "xelulu",
     "scheme": "xelulu",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "plugins": ["expo-router"],
     "experiments": {
       "typedRoutes": false

@@ -54,11 +54,65 @@ function readTextFile(relPath: string): string | null {
   return buf.toString("utf8");
 }
 
+/**
+ * The two local-only files that carry the Local_Mode defaults for `docker compose up`, so the
+ * stack starts with no root `.env`. Req 12.3/12.4 cannot be satisfied as written for them: the
+ * whole point of these files is to hold `KEY=<local value>`, and `${VAR:-default}` is not
+ * empty-equivalent (`isEmptyEquivalent` accepts only a bare `${NAME}`). Rather than skipping
+ * them — which would stop checking them for real secrets too — both stay in the scan and the
+ * allowance is written below as a positive assertion: only these two files, and in them only
+ * the nine non-secret Local_Mode device-seam keys.
+ *
+ * The pure check (`tooling/checks/secret-scan.ts`) is untouched; widening it would weaken the
+ * rule for the whole repository.
+ */
+const LOCAL_DEFAULT_FILES: ReadonlySet<string> = new Set([
+  ".env.local.example",
+  "docker-compose.yml",
+]);
+
+/** The nine keys those two files may assign: the device seam and the two local surface ports. */
+const LOCAL_DEFAULT_KEYS: ReadonlySet<string> = new Set([
+  "APP_ENV",
+  "MQTT_BROKER_URL",
+  "MQTT_USERNAME",
+  "MQTT_PASSWORD",
+  "AUDIO_WSS_URL",
+  "DEVICE_ID",
+  "DEVICE_TOKEN",
+  "GATEWAY_OPERATOR_PORT",
+  "SIMULATOR_PANEL_PORT",
+]);
+
+/** Keys that must never be assigned anywhere, the two local-only files included. */
+const NEVER_ASSIGNED_KEYS: readonly string[] = [
+  "SUPABASE_SERVICE_KEY",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_URL",
+  "DEVICE_PROVISION_SECRET",
+  "LLM_API_KEY",
+  "STT_API_KEY",
+  "TTS_API_KEY",
+];
+
 describe("Secret_Check on the real repository", () => {
   it("derives a non-empty Panel_Key set from the approved fixture", () => {
     const keys = panelKeys();
     expect(keys.length).toBeGreaterThan(0);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("allows only the nine non-secret Local_Mode keys in the two local-default files", () => {
+    const keys = new Set(panelKeys());
+    // The allowance is a subset of the panel, so it cannot smuggle in a key the panel never had.
+    for (const key of LOCAL_DEFAULT_KEYS) expect(keys.has(key), key).toBe(true);
+    // And it names no real secret: those stay forbidden everywhere, these two files included.
+    for (const key of NEVER_ASSIGNED_KEYS) {
+      expect(LOCAL_DEFAULT_KEYS.has(key), key).toBe(false);
+      expect(keys.has(key), `${key} is a Panel_Key`).toBe(true);
+    }
+    expect(LOCAL_DEFAULT_KEYS.size).toBe(9);
+    expect(LOCAL_DEFAULT_FILES.size).toBe(2);
   });
 
   it("finds no non-empty Panel_Key assignment in any tracked or unignored file", () => {
@@ -67,17 +121,33 @@ describe("Secret_Check on the real repository", () => {
     expect(files.length).toBeGreaterThan(0);
 
     const findings: SecretFinding[] = [];
-    let scanned = 0;
+    const scannedPaths: string[] = [];
     for (const file of files) {
       const text = readTextFile(file);
       if (text === null) continue;
-      scanned++;
+      scannedPaths.push(file);
       findings.push(...scanText(file, text, keys));
     }
 
-    expect(scanned).toBeGreaterThan(0);
+    expect(scannedPaths.length).toBeGreaterThan(0);
+    // Both local-default files are really in the scan, so the allowance below is not vacuous.
+    for (const file of LOCAL_DEFAULT_FILES) expect(scannedPaths).toContain(file);
+
+    const [local, elsewhere] = [
+      findings.filter((f) => LOCAL_DEFAULT_FILES.has(f.path)),
+      findings.filter((f) => !LOCAL_DEFAULT_FILES.has(f.path)),
+    ];
+
+    // Everywhere else the rule is unchanged: not one non-empty Panel_Key assignment.
     // Only `path:line KEY` is ever printed, so a failure cannot leak a value.
-    expect(findings, `Secret_Check findings:\n${formatFindings(findings)}`).toEqual([]);
+    expect(elsewhere, `Secret_Check findings:\n${formatFindings(elsewhere)}`).toEqual([]);
+
+    // In the two local-only files, every assignment names one of the nine allowed keys.
+    const disallowed = local.filter((f) => !LOCAL_DEFAULT_KEYS.has(f.key));
+    expect(
+      disallowed,
+      `Disallowed keys in the local-default files:\n${formatFindings(disallowed)}`,
+    ).toEqual([]);
   });
 });
 

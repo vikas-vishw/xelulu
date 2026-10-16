@@ -9,5 +9,5 @@
     "noEmit": true,
     "noUncheckedSideEffectImports": false
   },
-  "include": ["src"]
+  "include": ["src", "test", "vite-proxy.ts"]
 }

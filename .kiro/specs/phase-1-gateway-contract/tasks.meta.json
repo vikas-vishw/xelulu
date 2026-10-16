@@ -1,0 +1,81 @@
+{
+  "pbtResults": {
+    "12.2 Write property test for topic round trip in `topics.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791549115488
+    },
+    "12.3 Write property test for invalid topics in `topics.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791549116650
+    },
+    "22.4 Write property test for monotonicity in `age-stage.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791564415269
+    },
+    "14.1 Write property test for variant round trip in `codec-roundtrip.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791565272189
+    },
+    "14.2 Write property test for union round trip in `codec-roundtrip.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791565272413
+    },
+    "14.3 Write property test for serialisation stability in `codec-roundtrip.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791565274040
+    },
+    "15.1 Write property test for unknown keys in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566193886
+    },
+    "15.2 Write property test for literal-2 fields in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566194897
+    },
+    "15.3 Write property test for discriminators in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566195559
+    },
+    "15.4 Write property test for closed enums in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566196214
+    },
+    "15.5 Write property test for bounded numbers in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566196779
+    },
+    "15.6 Write property test for required fields and JSON types in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566197537
+    },
+    "15.7 Write property test for `ts` bounds in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566202523
+    },
+    "15.8 Write property test for throwing and serialising variants in `codec-rejection.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566204004
+    },
+    "16.1 Write property test for variant and topic isolation in `codec-rules.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566949805
+    },
+    "16.2 Write property test for the ack reason rule in `codec-rules.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566950927
+    },
+    "16.4 Write property test for open vocabularies in `codec-rules.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566955438
+    },
+    "17.1 Write property test for error shape and value leaks in `errors.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566956318
+    },
+    "17.2 Write property test for never-throwing parsers in `errors.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791566957413
+    }
+  },
+  "executionHistory": {}
+}

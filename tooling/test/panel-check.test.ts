@@ -14,7 +14,7 @@ const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PANEL_PATH = resolve(REPO_ROOT, ".env.example");
 const APPROVED_PATH = resolve(REPO_ROOT, "tooling/fixtures/approved-panel.txt");
 
-const EXPECTED_KEY_COUNT = 21;
+const EXPECTED_KEY_COUNT = 23;
 
 function declaredKeys(text: string): string[] {
   return parsePanel(text)

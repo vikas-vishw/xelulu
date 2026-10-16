@@ -1,0 +1,97 @@
+// Public surface of the Gateway_Log (Phase 1.2, G22, Req 12.1; Phase 3 C3, Req 17.1, 17.4). Not
+// part of the frozen Document B contract and not covered by proto_ver. Explicit named exports
+// only.
+
+export {
+  ABORT_CAUSES,
+  ACK_RESULT_OUTCOMES,
+  ALLOW_LISTED_TOOLS,
+  AUDIO_TURN_PHASES,
+  BRAIN_TURN_CAUSES,
+  BRAIN_TURN_PHASES,
+  DEFERRAL_TOPICS,
+  GATEWAY_ISSUE_KINDS,
+  GATEWAY_LOG_KINDS,
+  GATEWAY_LOG_VERSION,
+  GATEWAY_STATES,
+  INTERRUPT_CAUSES,
+  PARENT_ALERT_KINDS,
+  PRESENCE_CAUSES,
+  PROVIDER_CAPABILITIES,
+  PROVIDER_IDS,
+  SAFE_ISSUE_LIMITS,
+  SAFETY_DECISIONS,
+  SAFETY_RULES,
+  SAFETY_STAGES,
+  TIMEOUT_CAUSES,
+  TOOL_DENIED_REASONS,
+  TOOL_OUTCOMES,
+  TRANSCRIPT_RETENTION_ACTIONS,
+} from "./constants.js";
+export type {
+  AbortCause,
+  AckResultOutcome,
+  AllowListedTool,
+  AudioTurnPhase,
+  BrainTurnCause,
+  BrainTurnPhase,
+  DeferralTopic,
+  GatewayIssueKind,
+  GatewayLogKind,
+  GatewayState,
+  InterruptCause,
+  ParentAlertKind,
+  PresenceCause,
+  ProviderCapability,
+  ProviderId,
+  SafetyDecisionName,
+  SafetyRule,
+  SafetyStage,
+  TimeoutCause,
+  ToolDeniedReason,
+  ToolOutcome,
+  TranscriptRetentionAction,
+} from "./constants.js";
+
+export type {
+  AckResultLogEntry,
+  AudioTurnLogEntry,
+  AuthLogEntry,
+  AuthOutcome,
+  BrainTurnLogEntry,
+  EventAcceptedLogEntry,
+  EventDuplicateLogEntry,
+  EventOrdering,
+  GatewayLogEntry,
+  GatewayLogEntryOf,
+  GatewayStateLogEntry,
+  LoggedEvent,
+  LogTopicSuffix,
+  LogTransport,
+  MessageInLogEntry,
+  MessageOutLogEntry,
+  MessageRejectedLogEntry,
+  MessageVariantName,
+  ParentAlertLogEntry,
+  PresenceLogEntry,
+  ProviderCheckLogEntry,
+  SafeIssue,
+  SafeIssueKind,
+  SafetyDecisionLogEntry,
+  ToolCallLogEntry,
+  TranscriptRetentionLogEntry,
+} from "./entries.js";
+
+export { CONTRACT_FIELD_NAMES } from "./contract-field-names.js";
+export { toSafeIssues } from "./safe-issues.js";
+
+// Operator_Stream payloads (Phase 1.3, Req 2.5; Phase 3 C4, Req 18.1).
+export { OPERATOR_STREAM_EVENTS } from "./stream.js";
+export type {
+  ConversationTurnState,
+  ConversationTurnView,
+  DevicePresence,
+  DeviceSummary,
+  OperatorStreamDevices,
+  OperatorStreamEvent,
+} from "./stream.js";

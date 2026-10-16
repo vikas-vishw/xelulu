@@ -224,7 +224,7 @@ describe("real-repo manifests", () => {
       );
     });
 
-    it("has only gateway -> shared and simulator -> shared workspace edges", () => {
+    it("has only admin, gateway, parent-app and simulator -> shared workspace edges", () => {
       const edges = packages
         .flatMap(({ manifest }) =>
           depNames(manifest)
@@ -232,15 +232,23 @@ describe("real-repo manifests", () => {
             .map((d) => `${String(manifest.name)} -> ${d}`),
         )
         .sort();
+      // Phase 1.3 C13: the admin console imports @xelulu/shared for types and GATEWAY_LOG_KINDS.
+      // Phase 2.1 C5: the parent app imports @xelulu/shared for domain types, `import type` only.
       expect(edges).toEqual([
+        "@xelulu/admin -> @xelulu/shared",
         "@xelulu/gateway -> @xelulu/shared",
+        "@xelulu/parent-app -> @xelulu/shared",
         "@xelulu/simulator -> @xelulu/shared",
       ]);
     });
 
-    it("gives the shared package no runtime dependencies", () => {
-      const deps = pkg("@xelulu/shared").dependencies;
-      expect(deps === undefined || Object.keys(deps as object).length === 0).toBe(true);
+    it("gives the shared package exactly one runtime dependency, zod, at an exact 4.x version", () => {
+      const deps = (pkg("@xelulu/shared").dependencies ?? {}) as Record<string, unknown>;
+      expect(Object.keys(deps)).toEqual(["zod"]);
+      const spec = deps["zod"];
+      expect(typeof spec).toBe("string");
+      expect(spec).toMatch(/^4\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/); // bare MAJOR.MINOR.PATCH, Zod 4
+      expect(readFileSync(join(ROOT, "pnpm-lock.yaml"), "utf8")).toContain(`zod@${String(spec)}`);
     });
   });
 });

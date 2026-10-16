@@ -1,0 +1,9 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400014,
+  "type": "event",
+  "event_id": "ev_nfc_01",
+  "event": "nfc",
+  "time_uncertain": true,
+  "data": { "card_id": "story_042" }
+}

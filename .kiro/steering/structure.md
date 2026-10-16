@@ -42,6 +42,8 @@ xelulu/
 │     ├─ src/gateway-contract/  Document B types + Zod schemas + fixtures (frozen)
 │     ├─ src/domain/            Household, User, ChildProfile, Device, Session, Event,
 │     │                         ContentItem, GrandmaAsset, Consent, Report
+│     ├─ src/gateway-log/       Gateway_Log types, constants and Safe_Issue helper (not the contract)
+│     ├─ src/mock-audio/        Mock_Audio_Codec for test utterances (not the contract, deleted with the mocks)
 │     └─ src/index.ts
 ├─ docs/                 source documents (see docs/README.md)
 ├─ tooling/              repo-wide checks, local ESLint rule, fixtures (infrastructure, not a package)
@@ -65,5 +67,6 @@ xelulu/
 - **Domain model notes.**
   - `ChildProfile.age_stage` is `tiny|little|explorer|maker`.
   - `GrandmaAsset` requires a `consent_record_id`.
-  - Every row is scoped by `household_id`.
+  - Household-scoped rows carry `household_id` and are protected by RLS by household and role.
+  - Global curated content rows have `household_id` null, are a read-only reference for every household, and are written only by admins (service role or the admin console).
 - **Tests sit next to their package** in `test/`. Contract fixtures live in `packages/shared/src/gateway-contract/fixtures`.

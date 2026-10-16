@@ -11,7 +11,7 @@
     "lint": "eslint . --max-warnings=0",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
-    "test": "pnpm build && tsc -p tsconfig.test.json && vitest run",
+    "test": "pnpm build && tsc -p tsconfig.test.json && vitest run && pnpm --filter @xelulu/parent-app test",
     "start:app": "pnpm --filter @xelulu/parent-app start",
     "dev:admin": "pnpm --filter @xelulu/admin dev",
     "start:gateway": "pnpm --silent --filter @xelulu/gateway start",

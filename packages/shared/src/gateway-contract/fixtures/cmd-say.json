@@ -1,0 +1,11 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "9f2c",
+  "action": "say",
+  "data": {
+    "expression": "happy",
+    "lang": "en-IN",
+    "voice": "xelulu",
+    "duration_hint_ms": 2200
+  }
+}

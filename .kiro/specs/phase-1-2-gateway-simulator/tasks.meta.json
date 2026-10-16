@@ -1,0 +1,94 @@
+{
+  "pbtResults": {
+    "3.3 Write property test for Safe_Issue rules in `gateway-log.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791632272798
+    },
+    "5.6 Write property test for gateway config in `services/gateway/test/config.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637736084
+    },
+    "6.5 Write property test for simulator config in `services/simulator/test/config.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637736915
+    },
+    "8.2 Write property test for subscriber streams in `services/gateway/test/gateway-log.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637737641
+    },
+    "8.3 Write property test for JSON safety in `gateway-log.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637738494
+    },
+    "9.3 Write model-based property test for presence in `services/gateway/test/presence.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637739683
+    },
+    "9.5 Write property test for dedupe in `services/gateway/test/dedupe-store.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637741018
+    },
+    "9.6 Write property test for reprocessing in `dedupe-store.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791637741736
+    },
+    "11.3 Write model-based property test for ack tracking in `services/gateway/test/ack-tracker.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791640677307
+    },
+    "18.1 Write property test for rejected inbound messages in `inbound-pipeline.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791646909509
+    },
+    "18.2 Write property test for token secrecy in `services/gateway/test/auth.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791647120640
+    },
+    "18.4 Write property test for log redaction in `services/gateway/test/log-redaction.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791647435982
+    },
+    "19.4 Write property test for operator leaks in `services/gateway/test/operator-surface.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791648591629
+    },
+    "23.7 Write property test for acks in `services/simulator/test/command-handler.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791655803472
+    },
+    "24.3 Write property test for replay in `services/simulator/test/outbox.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791658340351
+    },
+    "30.1 Write property test for fired events in `event-factory.test.ts`": {
+      "status": "passed",
+      "lastRunTimestamp": 1791661654333
+    }
+  },
+  "executionHistory": {
+    "34.1 Update `services/gateway/Dockerfile`": [
+      {
+        "executionId": "b48c0bff-82c4-45d3-a291-23b6e33aca85",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791693322805
+      },
+      {
+        "executionId": "b48c0bff-82c4-45d3-a291-23b6e33aca85",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791693539452
+      }
+    ],
+    "34.2 Update `services/simulator/Dockerfile`": [
+      {
+        "executionId": "b48c0bff-82c4-45d3-a291-23b6e33aca85",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791693323753
+      },
+      {
+        "executionId": "b48c0bff-82c4-45d3-a291-23b6e33aca85",
+        "chatSessionId": "sess_cfe0a092-00ca-42fb-b3ff-10f45ee96635",
+        "timestamp": 1791693540137
+      }
+    ]
+  }
+}

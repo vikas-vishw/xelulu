@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_volume_01",
+  "action": "volume",
+  "data": { "level": 40 }
+}

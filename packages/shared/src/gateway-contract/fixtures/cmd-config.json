@@ -1,0 +1,12 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_config_01",
+  "action": "config",
+  "data": {
+    "volume": 40,
+    "quiet_hours": { "start": "20:30", "end": "07:00" },
+    "movement_on": true,
+    "language": "hi-IN",
+    "active_child_id": "c_01"
+  }
+}

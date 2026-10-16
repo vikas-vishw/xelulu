@@ -159,34 +159,45 @@ describe("root README (Req 14)", () => {
     });
   });
 
-  describe("gateway contract folder (Req 14.7)", () => {
-    it("says the gateway-contract folder is empty on purpose", () => {
-      expect(readme).toContain("gateway-contract");
-      expect(readmeLower).toContain("empty on purpose");
+  describe("gateway contract note (Phase 1 Req 17.6, 17.8)", () => {
+    it("says the contract folder holds Document B v2 at proto_ver 2, copied from the docx", () => {
+      const line = readme
+        .split("\n")
+        .find((l) => l.includes("packages/shared/src/gateway-contract/"));
+      expect(line, "README line about gateway-contract").toBeDefined();
+      expect(line).toContain("Document B v2");
+      expect(line).toContain("`proto_ver` 2");
+      expect(line).toContain("docs/B-gateway-and-hardware-seam.docx");
+    });
+
+    it("no longer says the folder is empty on purpose", () => {
+      expect(readmeLower).not.toContain("empty on purpose");
     });
   });
 
   describe("expected results (Req 14.8)", () => {
-    it("parent app: Expo Go shows the placeholder", () => {
+    // Phase 2.1 Req 10.4: the app now opens on the Home dashboard, not the Phase 0 placeholder.
+    it("parent app: Expo Go shows the Home dashboard", () => {
       const row = tableRow("pnpm start:app").toLowerCase();
       expect(row).toContain("expo go");
-      expect(row).toContain("placeholder");
+      expect(row).toContain("home dashboard");
     });
 
-    it("admin console: a localhost URL shows the placeholder", () => {
+    // Phase 2.1 Req 9.4: the deep-link note for every screen other than Home.
+    it("explains the deep-link prefix for a stack route", () => {
+      expect(readme).toContain("/--/");
+    });
+
+    // Phase 1.3 Req 9.4: the console now shows live data, not the Phase 0 placeholder.
+    it("admin console: a loopback URL shows the live console", () => {
       const row = tableRow("pnpm dev:admin");
       expect(row).toMatch(/https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/);
-      expect(row.toLowerCase()).toContain("placeholder");
+      expect(row.toLowerCase()).toContain("live console");
     });
 
-    it.each(["pnpm start:gateway", "pnpm start:simulator"])(
-      "%s prints ok and exits with code 0",
-      (command) => {
-        const row = tableRow(command);
-        expect(row).toContain("`ok`");
-        expect(row).toMatch(/exits? with code 0/);
-      },
-    );
+    it.each(["pnpm start:gateway", "pnpm start:simulator"])("%s keeps running", (command) => {
+      expect(tableRow(command)).toContain("keeps running");
+    });
 
     it("compose: the EMQX, gateway and simulator containers start", () => {
       const row = tableRow("docker compose up").toLowerCase();

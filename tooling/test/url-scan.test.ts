@@ -44,6 +44,26 @@ const EXCLUSIONS: readonly { reason: string; matches: (path: string) => boolean 
   },
 ];
 
+/**
+ * The two local-only files that carry the Local_Mode defaults for `docker compose up`, and the
+ * only two hosts they may name: `emqx` and `gateway` are Compose service names, resolvable on
+ * the Compose network alone — neither loopback nor reachable from the internet, so Req 12.6
+ * has no form they can be written in. They are deliberately NOT added to `EXCLUSIONS`: both
+ * files stay in the scan, and any other non-local host in them still fails.
+ *
+ * The detector (`tooling/checks/url-scan.ts`) is untouched.
+ */
+const LOCAL_DEFAULT_FILES: ReadonlySet<string> = new Set([
+  "docker-compose.yml",
+  ".env.local.example",
+]);
+const LOCAL_SERVICE_HOSTS: ReadonlySet<string> = new Set(["emqx", "gateway"]);
+
+/** True for the one finding shape the two local-only files are allowed to produce. */
+function isLocalServiceDefault(finding: UrlFinding): boolean {
+  return LOCAL_DEFAULT_FILES.has(finding.path) && LOCAL_SERVICE_HOSTS.has(finding.host);
+}
+
 /** Tracked plus untracked-but-not-ignored files, as repo-relative `/` paths. Fails without git. */
 function listRepoFiles(): string[] {
   const res = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
@@ -87,10 +107,13 @@ describe("real repo: non-local URLs", () => {
       findings.push(...findNonLocalUrls(file, text));
     }
 
-    // Guard against a scan that silently covers nothing.
+    // Guard against a scan that silently covers nothing. The two local-default files are named
+    // here too, so they can never silently drop out of scope.
     expect(scanned).toEqual(
       expect.arrayContaining([
         ".env.example",
+        ".env.local.example",
+        "docker-compose.yml",
         "package.json",
         "apps/admin/index.html",
         "apps/admin/vite.config.ts",
@@ -100,7 +123,11 @@ describe("real repo: non-local URLs", () => {
         "supabase/config.toml",
       ]),
     );
-    expect(findings, `Non-local URLs found:\n${format(findings)}`).toEqual([]);
+    expect(LOCAL_DEFAULT_FILES.size).toBe(2);
+    expect(LOCAL_SERVICE_HOSTS.size).toBe(2);
+
+    const reportable = findings.filter((f) => !isLocalServiceDefault(f));
+    expect(reportable, `Non-local URLs found:\n${format(reportable)}`).toEqual([]);
   });
 });
 

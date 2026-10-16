@@ -1,0 +1,10 @@
+// Fixture for tooling/test/gateway-boundaries.test.ts, read as if it were
+// services/gateway/src/audio/boundary-fixture.ts. One example of each banned pattern.
+// Not source code; never compiled, linted or formatted.
+import { createClient } from "@supabase/supabase-js";
+const reply = await fetch(target);
+const viaGlobal = globalThis.fetch;
+import { createMockStt } from "../brain/providers/mock-stt.js";
+const llm = createMockLlm({ clock, deadlines });
+import { createSarvamStt } from "../brain/providers/adapter-sarvam-stt.js";
+const tts = createElevenLabsTts();

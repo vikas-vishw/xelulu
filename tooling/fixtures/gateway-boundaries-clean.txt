@@ -1,0 +1,19 @@
+// Fixture for tooling/test/gateway-boundaries.test.ts, read as if it were
+// services/gateway/src/audio/boundary-fixture.ts. Uses only allowed imports and no global fetch.
+// The provider interfaces, their declaration and the Provider_Gate are allowed outside brain/;
+// only a provider implementation module (mock-* or adapter-*) is not.
+// Not source code; never compiled, linted or formatted.
+import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
+import { buildTopic, parseDeviceMessage } from "@xelulu/shared";
+import mqtt from "mqtt";
+import { WebSocketServer } from "ws";
+import { createFakeReply } from "../brain/fake-reply.js";
+import type { TurnResponder } from "../brain/turn-responder.js";
+import type { SttSession } from "../brain/providers/stt-provider.js";
+import { NO_RETENTION_NO_TRAINING } from "../brain/providers/provider-declaration.js";
+import { checkProviders } from "../brain/providers/provider-gate.js";
+import { createAudioTurn } from "./audio-turn.js";
+const response = await client.fetch(target);
+const prefetch = (value) => value;
+prefetch(1);

@@ -1,13 +1,461 @@
-// Req 8.7: the Phase 0 shared entry point has no named exports and no default export.
+// Phase 1 public surface of @xelulu/shared (Requirements 14.1–14.6, 17.3).
+// Replaces the Phase 0 "no named exports" test. The runtime list mirrors design.md
+// "Public exports"; the `import type` block fails the test type-check if a listed type is missing.
 import { describe, expect, it } from "vitest";
+
 import * as ns from "../dist/index.js";
+import type {
+  // Wire types: 24 variants.
+  AckMessage,
+  AnimateCmdMessage,
+  AudioEndMessage,
+  AudioStartMessage,
+  ButtonEventMessage,
+  ConfigCmdMessage,
+  CryEventMessage,
+  ErrorEventMessage,
+  GestureCmdMessage,
+  HelloMessage,
+  InterruptEventMessage,
+  LedCmdMessage,
+  MotionEventMessage,
+  MoveCmdMessage,
+  NfcEventMessage,
+  OtaCmdMessage,
+  PlayCmdMessage,
+  SayCmdMessage,
+  SetModeCmdMessage,
+  StatusMessage,
+  StopAudioCmdMessage,
+  TouchEventMessage,
+  VolumeCmdMessage,
+  WakeEventMessage,
+  // Wire types: unions and helpers.
+  AudioControlMessage,
+  CmdMessage,
+  DeviceMessage,
+  DeviceMessageForTopic,
+  EventDataFor,
+  EventMessage,
+  MoveCmdData,
+  MqttDeviceMessage,
+  QuietHours,
+  StatusTopicMessage,
+  // List types.
+  AckReason,
+  AckStatus,
+  ButtonAction,
+  ButtonName,
+  CmdAction,
+  EventKind,
+  LedEffect,
+  LedTarget,
+  Mode,
+  MotionKind,
+  MoveCommand,
+  PlaySource,
+  SayVoice,
+  TopicSuffix,
+  TouchGesture,
+  TouchZone,
+  WakeSource,
+  // API types.
+  ContractIssue,
+  ContractIssueKind,
+  ParseResult,
+  ParsedTopic,
+  // Domain types.
+  AgeStage,
+  AgeStageError,
+  AgeStageResult,
+  ChildProfile,
+  Consent,
+  ConsentPurpose,
+  ContentItem,
+  ContentItemBase,
+  ContentKind,
+  ContentRowClass,
+  Device,
+  Event,
+  GlobalContentItem,
+  GrandmaAsset,
+  GrandmaAssetKind,
+  Household,
+  HouseholdContentItem,
+  IsoDate,
+  IsoDateTime,
+  Report,
+  ReportPeriod,
+  Session,
+  TranscriptSpeaker,
+  TranscriptTurn,
+  User,
+  UserRole,
+  VerificationMethod,
+  // Gateway_Log types.
+  GatewayLogEntry,
+  GatewayLogEntryOf,
+  GatewayLogKind,
+  GatewayStateLogEntry,
+  MessageInLogEntry,
+  MessageOutLogEntry,
+  MessageRejectedLogEntry,
+  AuthLogEntry,
+  PresenceLogEntry,
+  EventAcceptedLogEntry,
+  EventDuplicateLogEntry,
+  AckResultLogEntry,
+  AudioTurnLogEntry,
+  GatewayState,
+  GatewayIssueKind,
+  SafeIssue,
+  SafeIssueKind,
+  AbortCause,
+  InterruptCause,
+  AudioTurnPhase,
+  AckResultOutcome,
+  TimeoutCause,
+  PresenceCause,
+  LogTransport,
+  LogTopicSuffix,
+  MessageVariantName,
+  AuthOutcome,
+  EventOrdering,
+  LoggedEvent,
+  // Operator_Stream types (Phase 1.3).
+  DevicePresence,
+  DeviceSummary,
+  OperatorStreamDevices,
+  OperatorStreamEvent,
+  // Phase 3: language, the six new Log_Entry kinds, their lists and the Mock_Audio_Codec.
+  SupportedLang,
+  BrainTurnLogEntry,
+  SafetyDecisionLogEntry,
+  ToolCallLogEntry,
+  ProviderCheckLogEntry,
+  ParentAlertLogEntry,
+  TranscriptRetentionLogEntry,
+  BrainTurnPhase,
+  BrainTurnCause,
+  SafetyStage,
+  SafetyDecisionName,
+  SafetyRule,
+  DeferralTopic,
+  AllowListedTool,
+  ToolOutcome,
+  ToolDeniedReason,
+  ProviderCapability,
+  ProviderId,
+  ParentAlertKind,
+  TranscriptRetentionAction,
+  ConversationTurnState,
+  ConversationTurnView,
+  UtteranceFrames,
+  DecodedUtterance,
+} from "../dist/index.js";
+
+// Referencing every imported type keeps the import meaningful (a missing name is a type error)
+// and keeps lint from flagging unused imports.
+export type ListedTypes = [
+  AckMessage,
+  AnimateCmdMessage,
+  AudioEndMessage,
+  AudioStartMessage,
+  ButtonEventMessage,
+  ConfigCmdMessage,
+  CryEventMessage,
+  ErrorEventMessage,
+  GestureCmdMessage,
+  HelloMessage,
+  InterruptEventMessage,
+  LedCmdMessage,
+  MotionEventMessage,
+  MoveCmdMessage,
+  NfcEventMessage,
+  OtaCmdMessage,
+  PlayCmdMessage,
+  SayCmdMessage,
+  SetModeCmdMessage,
+  StatusMessage,
+  StopAudioCmdMessage,
+  TouchEventMessage,
+  VolumeCmdMessage,
+  WakeEventMessage,
+  AudioControlMessage,
+  CmdMessage,
+  DeviceMessage,
+  DeviceMessageForTopic<"status">,
+  EventDataFor<"cry">,
+  EventMessage,
+  MoveCmdData,
+  MqttDeviceMessage,
+  QuietHours,
+  StatusTopicMessage,
+  AckReason,
+  AckStatus,
+  ButtonAction,
+  ButtonName,
+  CmdAction,
+  EventKind,
+  LedEffect,
+  LedTarget,
+  Mode,
+  MotionKind,
+  MoveCommand,
+  PlaySource,
+  SayVoice,
+  TopicSuffix,
+  TouchGesture,
+  TouchZone,
+  WakeSource,
+  ContractIssue,
+  ContractIssueKind,
+  ParseResult<unknown>,
+  ParsedTopic,
+  AgeStage,
+  AgeStageError,
+  AgeStageResult,
+  ChildProfile,
+  Consent,
+  ConsentPurpose,
+  ContentItem,
+  ContentItemBase,
+  ContentKind,
+  ContentRowClass,
+  Device,
+  Event,
+  GlobalContentItem,
+  GrandmaAsset,
+  GrandmaAssetKind,
+  Household,
+  HouseholdContentItem,
+  IsoDate,
+  IsoDateTime,
+  Report,
+  ReportPeriod,
+  Session,
+  TranscriptSpeaker,
+  TranscriptTurn,
+  User,
+  UserRole,
+  VerificationMethod,
+  GatewayLogEntry,
+  GatewayLogEntryOf<"gateway">,
+  GatewayLogKind,
+  GatewayStateLogEntry,
+  MessageInLogEntry,
+  MessageOutLogEntry,
+  MessageRejectedLogEntry,
+  AuthLogEntry,
+  PresenceLogEntry,
+  EventAcceptedLogEntry,
+  EventDuplicateLogEntry,
+  AckResultLogEntry,
+  AudioTurnLogEntry,
+  GatewayState,
+  GatewayIssueKind,
+  SafeIssue,
+  SafeIssueKind,
+  AbortCause,
+  InterruptCause,
+  AudioTurnPhase,
+  AckResultOutcome,
+  TimeoutCause,
+  PresenceCause,
+  LogTransport,
+  LogTopicSuffix,
+  MessageVariantName,
+  AuthOutcome,
+  EventOrdering,
+  LoggedEvent,
+  DevicePresence,
+  DeviceSummary,
+  OperatorStreamDevices,
+  OperatorStreamEvent,
+  SupportedLang,
+  BrainTurnLogEntry,
+  SafetyDecisionLogEntry,
+  ToolCallLogEntry,
+  ProviderCheckLogEntry,
+  ParentAlertLogEntry,
+  TranscriptRetentionLogEntry,
+  BrainTurnPhase,
+  BrainTurnCause,
+  SafetyStage,
+  SafetyDecisionName,
+  SafetyRule,
+  DeferralTopic,
+  AllowListedTool,
+  ToolOutcome,
+  ToolDeniedReason,
+  ProviderCapability,
+  ProviderId,
+  ParentAlertKind,
+  TranscriptRetentionAction,
+  ConversationTurnState,
+  ConversationTurnView,
+  UtteranceFrames,
+  DecodedUtterance,
+];
+
+const VARIANT_TYPE_NAMES = [
+  "HelloMessage",
+  "StatusMessage",
+  "TouchEventMessage",
+  "WakeEventMessage",
+  "CryEventMessage",
+  "MotionEventMessage",
+  "ButtonEventMessage",
+  "NfcEventMessage",
+  "InterruptEventMessage",
+  "ErrorEventMessage",
+  "AudioStartMessage",
+  "AudioEndMessage",
+  "AckMessage",
+  "SayCmdMessage",
+  "AnimateCmdMessage",
+  "GestureCmdMessage",
+  "MoveCmdMessage",
+  "PlayCmdMessage",
+  "SetModeCmdMessage",
+  "LedCmdMessage",
+  "VolumeCmdMessage",
+  "ConfigCmdMessage",
+  "StopAudioCmdMessage",
+  "OtaCmdMessage",
+] as const;
+
+const UNION_TYPE_NAMES = [
+  "StatusTopicMessage",
+  "EventMessage",
+  "AudioControlMessage",
+  "CmdMessage",
+] as const;
+
+const MESSAGE_TYPE_NAMES = [...VARIANT_TYPE_NAMES, ...UNION_TYPE_NAMES];
+
+const EXPECTED_RUNTIME_EXPORTS: readonly string[] = [
+  // Constants.
+  "PROTO_VER",
+  "AUDIO_FORMAT",
+  "TOPIC_PREFIX",
+  "TOPIC_SUFFIXES",
+  // Topics.
+  "buildTopic",
+  "parseTopic",
+  // Errors.
+  "ContractError",
+  // Closed lists.
+  "TOUCH_ZONES",
+  "TOUCH_GESTURES",
+  "WAKE_SOURCES",
+  "MOTION_KINDS",
+  "BUTTONS",
+  "BUTTON_ACTIONS",
+  "MODES",
+  "MOVE_COMMANDS",
+  "PLAY_SOURCES",
+  "LED_TARGETS",
+  "LED_EFFECTS",
+  "SAY_VOICES",
+  "ACK_STATUSES",
+  "ACK_REASONS",
+  "EVENT_KINDS",
+  "CMD_ACTIONS",
+  // Open vocabularies.
+  "KNOWN_EXPRESSIONS",
+  "KNOWN_EYES",
+  "KNOWN_GESTURE_NAMES",
+  // Schemas (24 variants + 4 unions).
+  ...MESSAGE_TYPE_NAMES.map((n) => `${n}Schema`),
+  // Codecs (24 variants + 4 unions, three functions each).
+  ...MESSAGE_TYPE_NAMES.flatMap((n) => [`parse${n}`, `parse${n}OrThrow`, `serialise${n}`]),
+  // Device dispatch.
+  "parseDeviceMessage",
+  "parseDeviceMessageOrThrow",
+  // Domain.
+  "AGE_STAGES",
+  "deriveAgeStage",
+  "DEFAULT_TRANSCRIPT_RETENTION_DAYS",
+  "contentRowClass",
+  // Gateway_Log.
+  "GATEWAY_LOG_VERSION",
+  "GATEWAY_LOG_KINDS",
+  "GATEWAY_STATES",
+  "GATEWAY_ISSUE_KINDS",
+  "ABORT_CAUSES",
+  "INTERRUPT_CAUSES",
+  "AUDIO_TURN_PHASES",
+  "ACK_RESULT_OUTCOMES",
+  "TIMEOUT_CAUSES",
+  "PRESENCE_CAUSES",
+  "SAFE_ISSUE_LIMITS",
+  "CONTRACT_FIELD_NAMES",
+  "toSafeIssues",
+  // Operator_Stream (Phase 1.3).
+  "OPERATOR_STREAM_EVENTS",
+  // Phase 3 (C3, C6, C13): the new Gateway_Log lists, the supported languages and the codec.
+  "BRAIN_TURN_PHASES",
+  "BRAIN_TURN_CAUSES",
+  "SAFETY_STAGES",
+  "SAFETY_DECISIONS",
+  "SAFETY_RULES",
+  "DEFERRAL_TOPICS",
+  "ALLOW_LISTED_TOOLS",
+  "TOOL_OUTCOMES",
+  "TOOL_DENIED_REASONS",
+  "PROVIDER_CAPABILITIES",
+  "PROVIDER_IDS",
+  "PARENT_ALERT_KINDS",
+  "TRANSCRIPT_RETENTION_ACTIONS",
+  "SUPPORTED_LANGS",
+  "MOCK_AUDIO_VERSION",
+  "MOCK_FRAME_MAX_BYTES",
+  "encodeUtteranceFrames",
+  "decodeUtteranceFrames",
+];
+
+const exported = ns as Record<string, unknown>;
+
+/** A plain object (or array of them) carrying `proto_ver` looks like a shipped fixture. */
+function looksLikeWireMessage(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(looksLikeWireMessage);
+  if (value === null || typeof value !== "object") return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  const isPlain = proto === Object.prototype || proto === null;
+  return isPlain && Object.prototype.hasOwnProperty.call(value, "proto_ver");
+}
 
 describe("@xelulu/shared entry point", () => {
-  it("has no named exports", () => {
-    expect(Object.keys(ns)).toEqual([]);
+  it("exports exactly the runtime names in the design's public export list", () => {
+    // Phase 1.2 and 1.3 left 158; Phase 3 adds exactly the 18 names its design lists (Req 21.5).
+    expect(EXPECTED_RUNTIME_EXPORTS).toHaveLength(176);
+    expect(new Set(EXPECTED_RUNTIME_EXPORTS).size).toBe(EXPECTED_RUNTIME_EXPORTS.length);
+    expect(Object.keys(ns).sort()).toEqual([...EXPECTED_RUNTIME_EXPORTS].sort());
+  });
+
+  it("is at Gateway_Log version 2 (Req 21.5)", () => {
+    expect(ns.GATEWAY_LOG_VERSION).toBe(2);
   });
 
   it("has no default export", () => {
     expect("default" in ns).toBe(false);
+  });
+
+  it("exports no fixture-shaped value", () => {
+    const fixtureLike = Object.keys(exported).filter((k) => looksLikeWireMessage(exported[k]));
+    expect(fixtureLike).toEqual([]);
+  });
+
+  it("exports codecs and dispatch as functions and schemas with safeParse", () => {
+    for (const n of MESSAGE_TYPE_NAMES) {
+      expect(typeof exported[`parse${n}`], `parse${n}`).toBe("function");
+      expect(typeof exported[`parse${n}OrThrow`], `parse${n}OrThrow`).toBe("function");
+      expect(typeof exported[`serialise${n}`], `serialise${n}`).toBe("function");
+      const schema = exported[`${n}Schema`] as { safeParse?: unknown } | undefined;
+      expect(typeof schema?.safeParse, `${n}Schema.safeParse`).toBe("function");
+    }
+    expect(typeof ns.parseDeviceMessage).toBe("function");
+    expect(typeof ns.parseDeviceMessageOrThrow).toBe("function");
   });
 });

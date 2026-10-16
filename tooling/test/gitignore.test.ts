@@ -39,7 +39,9 @@ const MUST_BE_IGNORED = [
   ".tools/x",
 ];
 
-const MUST_NOT_BE_IGNORED = [".env.example"];
+// `.env.local.example` is the tracked dev-only defaults file (not the Connection_Panel). It is
+// the only second exception to `.env.*`; `.env` and `.env.local` above stay ignored.
+const MUST_NOT_BE_IGNORED = [".env.example", ".env.local.example"];
 
 describe(".gitignore rules", () => {
   it.each(MUST_BE_IGNORED)("ignores %s", (path) => {

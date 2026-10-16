@@ -52,31 +52,36 @@ Safety is ours and runs regardless of provider (see `safety.md`). Vendor SDKs ne
 - Voice cloning (Coqui XTTS and similar): some models are non-commercial only.
 - Every individual Rive/Lottie art file.
 
-## Document B seam (frozen contract, proto_ver 1)
-- Document B is the source of truth. If code disagrees with Document B, the code is wrong.
+## Document B seam (frozen contract, proto_ver 2)
+- Document B v2 (`proto_ver` 2) is the source of truth. If code disagrees with it, the code is wrong.
+- `docs/B-gateway-and-hardware-seam.docx` is Document B Version 2.0 (8 Oct 2026), frozen (`proto_ver` 2). Hardware-facing details are verified against firmware at Phase 6; nothing in the build waits on the intern. Omar's rulings on its open points are recorded in the Phase 1 gateway-contract spec.
+- Pairing (Bluetooth and Wi-Fi provisioning) is defined in Document C, not in Document B.
 - Changes only happen with a `proto_ver` bump and sign-off from both the software and hardware sides.
 - Never invent fields, rename enums or "improve" the wire format.
 
 ### Topics
+Four topics only:
 - `xelulu/{device_id}/status`: device → cloud. `hello` on connect, `status` every 15 s.
 - `xelulu/{device_id}/event`: device → cloud. Event types: touch, wake, cry, motion, button, nfc, interrupt, error.
 - `xelulu/{device_id}/cmd`: cloud → device. Actions: say, animate, gesture, move, play, set_mode, led, volume, config, stop_audio, ota.
 - `xelulu/{device_id}/ack`: device → cloud. Status is `accepted|done|rejected|failed`, with a `reason`.
-- `xelulu/{device_id}/ota`: subscribed by the device (see the open ambiguity in the approval notes).
+
+There is no OTA topic. `ota` is a `cmd` action carrying `data.manifest_url` and a `cmd_id`, and the device answers it with an `ack` like any other command.
 
 ### Message rules
 - Every message carries `proto_ver`.
 - Upstream messages carry `ts` (unix seconds) and `type`.
 - Every command carries `cmd_id`, and commands are idempotent.
-- Every event carries `event_id`. The cloud dedupes events, including back-dated ones that arrive after the robot was offline.
+- Every event carries `event_id`, and may carry an optional boolean `time_uncertain`. The cloud dedupes events, including back-dated ones that arrive after the robot was offline.
 - QoS: commands use 1; telemetry uses 0 or 1.
 - A device is considered offline after 45 s of silence.
 - On a `proto_ver` mismatch, the device keeps its last-known-good state and reports the mismatch.
 
 ### Audio turns
 - Open the socket at `AUDIO_WSS_URL`.
-- Send `{type:"audio_start",turn_id}`, then binary Opus frames, then `{type:"audio_end",turn_id}`.
+- Send `{proto_ver:2,ts,type:"audio_start",turn_id}`, then binary Opus frames, then `{proto_ver:2,ts,type:"audio_end",turn_id}`.
 - `say` audio is streamed down the WebSocket, never as a URL.
+- Barge-in: the device sends an `interrupt` event; the cloud then sends `audio_end` for the current turn, followed by a `stop_audio` command. There is no WebSocket cancel frame.
 
 ### Device facts
 - Ack `reason` values are the hardware's truth. The cloud must accept them, not retry around them.
@@ -84,7 +89,7 @@ Safety is ours and runs regardless of provider (see `safety.md`). Vendor SDKs ne
 - `device_id` is issued by the cloud at provisioning and bound to exactly one `household_id`.
 
 ### Where the types live
-`packages/shared/src/gateway-contract/` holds the TypeScript types and Zod schemas generated from Document B, with golden fixtures copied from Document B's examples. Everything imports the contract from there and nowhere else.
+`packages/shared/src/gateway-contract/` holds the TypeScript types and Zod schemas for Document B v2, with golden fixtures copied from Document B v2's examples (hello and ack add `ts` per the envelope rule) or constructed from its field tables. Everything imports the contract from there and nowhere else.
 
 ## Hardware context (for reasoning, not for code here)
 - ESP32-S3 (N16R8) handles voice, face, wake word, cry detection, MQTT and WS.

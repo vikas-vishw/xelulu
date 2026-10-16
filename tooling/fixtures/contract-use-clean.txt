@@ -1,0 +1,32 @@
+// Fixture for tooling/test/contract-use.test.ts: uses only Contract_Module functions and enum
+// constants, so the contract-use check reports nothing.
+// Not source code; never compiled, linted or formatted.
+
+import {
+  buildTopic,
+  parseCmdMessage,
+  serialiseAckMessage,
+  TOUCH_ZONES,
+  type AckMessage,
+  type CmdMessage,
+  type TouchZone,
+} from "@xelulu/shared";
+import { type ParseResult as Parsed } from "@xelulu/shared";
+
+type LocalZone = TouchZone;
+
+interface PendingCommand {
+  readonly cmd: CmdMessage;
+  readonly sentAt: number;
+}
+
+const commandTopic = buildTopic(deviceId, "cmd");
+const isZone = (zone: string): zone is LocalZone => (TOUCH_ZONES as readonly string[]).includes(zone);
+const parsed: Parsed<CmdMessage> = parseCmdMessage(payload);
+const reply: AckMessage = makeAck(parsed);
+const wire = serialiseAckMessage(reply);
+
+// Values that are not all in one contract list are not a wire value list.
+const stages = ["idle", "receiving", "replying"];
+type Outcome = "ok" | "failed_to_parse";
+const single = ["head"];

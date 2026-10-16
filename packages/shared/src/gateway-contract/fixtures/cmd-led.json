@@ -1,0 +1,11 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_led_01",
+  "action": "led",
+  "data": {
+    "target": "ears",
+    "color": "#FFB347",
+    "effect": "solid",
+    "brightness": 60
+  }
+}

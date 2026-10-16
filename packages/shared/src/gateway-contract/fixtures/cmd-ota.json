@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "a1b2",
+  "action": "ota",
+  "data": { "manifest_url": "https://localhost/ota/manifest.json" }
+}

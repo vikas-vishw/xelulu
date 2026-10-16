@@ -17,15 +17,85 @@ services:
       timeout: 5s
       retries: 24
     restart: "no"
+  # The gateway and simulator are long-running. Each publishes exactly one port, on host
+  # 127.0.0.1 only: the gateway's Operator_Surface and the simulator's Control_Surface. The
+  # command is each image's CMD plus the argument that binds that surface on all container
+  # interfaces (Local_Mode only). The gateway also takes the Transcripts_Argument, so this local
+  # stack shows transcript and reply text on the operator channel; it has effect in Local_Mode
+  # only. The CLIs are still driven with `docker compose exec`.
+  #
+  # Each service's `environment:` carries its own eight G3 keys with Local_Mode defaults, so
+  # `docker compose up --build` works with no root `.env` at all. Every value is written
+  # ${VAR:-default}, and `environment:` overrides `env_file:`, so a root `.env` still wins:
+  # Compose reads that file both for interpolation and as the env_file, and `:-` also replaces an
+  # empty value, so even a `.env` copied straight from `.env.example` yields these defaults.
+  # These are dev placeholders for a loopback-only stack; nothing real belongs in this file.
+  #
+  # MQTT_USERNAME and MQTT_PASSWORD take the bare ${VAR} form with no default on purpose. EMQX
+  # 5.8.9 with no authenticator configured accepts anonymous connections (verified against this
+  # image), and Local_Mode maps an unset or empty broker credential to null, so the correct local
+  # value is no value.
+  #
+  # AUDIO_WSS_URL names the `gateway` service at 8081: the audio listen port is that URL's port,
+  # and a non-loopback host makes the gateway bind 0.0.0.0 inside its container, which is what
+  # lets the simulator dial it over the Compose network. It is deliberately not published.
   gateway:
     build: { context: ., dockerfile: services/gateway/Dockerfile }
+    command: ["node", "dist/index.js", "--listen-all-interfaces", "--operator-transcripts"]
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      MQTT_BROKER_URL: "${MQTT_BROKER_URL:-mqtt://emqx:1883}"
+      MQTT_USERNAME: "${MQTT_USERNAME}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD}"
+      AUDIO_WSS_URL: "${AUDIO_WSS_URL:-ws://gateway:8081}"
+      DEVICE_ID: "${DEVICE_ID:-xlu_000123}"
+      DEVICE_TOKEN: "${DEVICE_TOKEN:-dev_local_only_not_a_secret}"
+      GATEWAY_OPERATOR_PORT: "${GATEWAY_OPERATOR_PORT:-8090}"
+    ports:
+      - "127.0.0.1:${GATEWAY_OPERATOR_PORT:-8090}:${GATEWAY_OPERATOR_PORT:-8090}"
     env_file:
       - path: ./.env
         required: false
+    # The service's own CLI, which talks to its surface over loopback with node:http: no curl, no
+    # wget and no added dependency. The CLI's own budget is 5 s, inside the 10 s timeout. The
+    # first check lands one interval in, by which time the broker connect that follows the
+    # Operator_Surface listen has long since happened, so a healthy gateway is a subscribed one.
+    healthcheck:
+      test: ["CMD", "node", "dist/cli.js", "devices"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 60s
+    depends_on:
+      emqx:
+        condition: service_healthy
     restart: "no"
   simulator:
     build: { context: ., dockerfile: services/simulator/Dockerfile }
+    command: ["node", "dist/index.js", "--listen-all-interfaces"]
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      MQTT_BROKER_URL: "${MQTT_BROKER_URL:-mqtt://emqx:1883}"
+      MQTT_USERNAME: "${MQTT_USERNAME}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD}"
+      AUDIO_WSS_URL: "${AUDIO_WSS_URL:-ws://gateway:8081}"
+      DEVICE_ID: "${DEVICE_ID:-xlu_000123}"
+      DEVICE_TOKEN: "${DEVICE_TOKEN:-dev_local_only_not_a_secret}"
+      SIMULATOR_PANEL_PORT: "${SIMULATOR_PANEL_PORT:-8091}"
+    ports:
+      - "127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}"
     env_file:
       - path: ./.env
         required: false
+    healthcheck:
+      test: ["CMD", "node", "dist/cli.js", "state"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 60s
+    depends_on:
+      emqx:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
     restart: "no"

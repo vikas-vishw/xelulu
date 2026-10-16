@@ -1,0 +1,16 @@
+// Fixture for tooling/test/contract-use.test.ts: one example of each banned pattern.
+// Not source code; never compiled, linted or formatted.
+
+// zod_import
+import { z } from "zod";
+
+// topic_literal
+const commandTopic = "xelulu/" + deviceId + "/cmd";
+
+// contract_type_name
+interface AckMessage {
+  status: string;
+}
+
+// wire_value_list
+const zonesToTry = ["head", "belly"];

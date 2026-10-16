@@ -1,0 +1,12 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400000,
+  "type": "status",
+  "battery_pct": 72,
+  "charging": false,
+  "mode": "idle",
+  "wifi_rssi": -58,
+  "fault": [],
+  "active_child_id": "c_01",
+  "temp_c": 31
+}

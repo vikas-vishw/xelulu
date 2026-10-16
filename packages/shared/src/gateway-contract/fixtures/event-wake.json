@@ -1,0 +1,8 @@
+{
+  "proto_ver": 2,
+  "ts": 1733400010,
+  "type": "event",
+  "event_id": "ev_wake_01",
+  "event": "wake",
+  "data": { "source": "hey_lulu", "dir_deg": 45 }
+}

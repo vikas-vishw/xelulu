@@ -1,10 +1,10 @@
-// Placeholder palette contrast checks (Req 4.7, 5.5; design: tooling/test/contrast.test.ts).
-// Known-value checks of `contrastRatio`, then every title/body-on-background pair of the
-// parent-app palette (tailwind.config.js) and the admin palette (styles.css custom properties)
-// must reach at least 4.5:1 in both light and dark mode.
+// Contrast checks (Phase 0 Req 5.5; Phase 2.1 Req 1.5, 1.6, 10.3).
+// Known-value checks of `contrastRatio`, then:
+//   - the parent app's Contrast_Pairs in apps/parent-app/src/theme/tokens.json (Property 2),
+//   - the admin palette (styles.css custom properties) in both light and dark mode.
+// The Phase 0 parent-app placeholder palette is gone with the placeholder screen (C9).
 
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -12,14 +12,28 @@ import { describe, expect, it } from "vitest";
 import { contrastRatio } from "../checks/contrast.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const TAILWIND_CONFIG = join(ROOT, "apps/parent-app/tailwind.config.js");
+const TOKENS_JSON = join(ROOT, "apps/parent-app/src/theme/tokens.json");
 const ADMIN_CSS = join(ROOT, "apps/admin/src/styles.css");
 
 const MIN_RATIO = 4.5;
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+/** The smallest typography size the token source may define (Req 1.5). */
+const MIN_FONT_SIZE = 12;
+
+/** Non-vacuity floor for the pair list (Req 1.6). */
+const MIN_PAIR_COUNT = 20;
+
 type Palette = { bg: string; title: string; body: string };
 type ModePalettes = { light: Palette; dark: Palette };
+
+type TypeStyle = { size: number; lineHeight: number; weight: string };
+type ContrastPair = { fg: string; bg: string; min: number; use: string };
+type Tokens = {
+  color: Record<string, string>;
+  typography: Record<string, TypeStyle>;
+  contrastPairs: ContrastPair[];
+};
 
 function asHex(value: unknown, label: string): string {
   if (typeof value !== "string" || !HEX.test(value)) {
@@ -28,26 +42,8 @@ function asHex(value: unknown, label: string): string {
   return value;
 }
 
-/** Loads the CommonJS tailwind config and returns `theme.extend.colors.placeholder`. */
-function loadParentAppPalette(): ModePalettes {
-  const requireCjs = createRequire(import.meta.url);
-  const config = requireCjs(TAILWIND_CONFIG) as {
-    theme?: { extend?: { colors?: { placeholder?: Record<string, unknown> } } };
-  };
-  const p = config.theme?.extend?.colors?.placeholder;
-  if (!p) throw new Error("tailwind.config.js has no theme.extend.colors.placeholder");
-  return {
-    light: {
-      bg: asHex(p["bg"], "placeholder.bg"),
-      title: asHex(p["title"], "placeholder.title"),
-      body: asHex(p["body"], "placeholder.body"),
-    },
-    dark: {
-      bg: asHex(p["bg-dark"], "placeholder.bg-dark"),
-      title: asHex(p["title-dark"], "placeholder.title-dark"),
-      body: asHex(p["body-dark"], "placeholder.body-dark"),
-    },
-  };
+function loadTokens(): Tokens {
+  return JSON.parse(readFileSync(TOKENS_JSON, "utf8")) as Tokens;
 }
 
 /** Reads `--xl-bg`, `--xl-title` and `--xl-body` from the first `:root { … }` block in `css`. */
@@ -116,11 +112,63 @@ describe("contrastRatio known values", () => {
   );
 });
 
-describe.each([
-  ["parent app (tailwind.config.js)", loadParentAppPalette],
-  ["admin console (styles.css)", loadAdminPalette],
-] as const)("%s placeholder palette", (_label, load) => {
-  const palettes = load();
+describe("parent app design tokens (src/theme/tokens.json)", () => {
+  const tokens = loadTokens();
+
+  it(`lists at least ${MIN_PAIR_COUNT} Contrast_Pairs (non-vacuous)`, () => {
+    expect(Array.isArray(tokens.contrastPairs)).toBe(true);
+    expect(tokens.contrastPairs.length).toBeGreaterThanOrEqual(MIN_PAIR_COUNT);
+  });
+
+  it("gives every colour token a #RGB/#RRGGBB value", () => {
+    const names = Object.keys(tokens.color);
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) asHex(tokens.color[name], `color.${name}`);
+  });
+
+  // Feature: phase-2-1-parent-app-shell, Property 2: Every listed pair meets its minimum
+  // Validates: Requirements 1.5, 1.6
+  it("meets every Contrast_Pair's minimum, with both tokens defined and a stated use", () => {
+    const failures: string[] = [];
+    for (const pair of tokens.contrastPairs) {
+      expect([3, 4.5], `pair ${pair.fg}/${pair.bg} min`).toContain(pair.min);
+      expect(String(pair.use ?? "").length, `pair ${pair.fg}/${pair.bg} use`).toBeGreaterThan(0);
+      const fg = asHex(tokens.color[pair.fg], `color.${pair.fg} (pair foreground)`);
+      const bg = asHex(tokens.color[pair.bg], `color.${pair.bg} (pair background)`);
+      const ratio = contrastRatio(fg, bg);
+      if (ratio < pair.min) {
+        failures.push(`${pair.fg} on ${pair.bg} = ${ratio.toFixed(2)} (min ${pair.min})`);
+      }
+    }
+    expect(failures, `Contrast_Pairs below their minimum:\n${failures.join("\n")}`).toEqual([]);
+  });
+
+  it("uses every text-* colour as a Contrast_Pair foreground", () => {
+    const foregrounds = new Set(tokens.contrastPairs.map((p) => p.fg));
+    const textColors = Object.keys(tokens.color).filter((name) => name.startsWith("text-"));
+    expect(textColors.length).toBeGreaterThan(0);
+    const missing = textColors.filter((name) => !foregrounds.has(name));
+    expect(missing, `text-* colours never checked as a foreground: ${missing.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
+  it(`gives every typography token a size of at least ${MIN_FONT_SIZE} pt`, () => {
+    const names = Object.keys(tokens.typography);
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      const style = tokens.typography[name];
+      expect(typeof style?.size, `typography.${name}.size`).toBe("number");
+      expect(style?.size ?? 0, `typography.${name}.size`).toBeGreaterThanOrEqual(MIN_FONT_SIZE);
+      expect(style?.lineHeight ?? 0, `typography.${name}.lineHeight`).toBeGreaterThanOrEqual(
+        style?.size ?? 0,
+      );
+    }
+  });
+});
+
+describe("admin console (styles.css) placeholder palette", () => {
+  const palettes = loadAdminPalette();
 
   it("defines a light and a dark palette (non-vacuous)", () => {
     for (const mode of ["light", "dark"] as const) {

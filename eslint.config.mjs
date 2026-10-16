@@ -76,8 +76,16 @@ export default defineConfig([
     },
   },
   {
-    files: ["apps/admin/src/**"],
+    files: ["apps/admin/src/**", "apps/admin/test/**"],
     languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
+    // The simulator's static web panel (design D11): browser globals and ES module syntax.
+    files: ["services/simulator/panel/**/*.js"],
+    languageOptions: {
+      sourceType: "module",
       globals: globals.browser,
     },
   },

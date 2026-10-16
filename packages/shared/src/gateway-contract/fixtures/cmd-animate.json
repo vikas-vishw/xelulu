@@ -1,0 +1,6 @@
+{
+  "proto_ver": 2,
+  "cmd_id": "c_animate_01",
+  "action": "animate",
+  "data": { "expression": "curious", "eyes": "blink", "loop": false }
+}

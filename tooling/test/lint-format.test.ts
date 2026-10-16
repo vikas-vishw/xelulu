@@ -27,6 +27,7 @@ const EXCLUDED_PATHS = [
   "apps/parent-app/expo-env.d.ts",
   "pnpm-lock.yaml",
   ".env.example",
+  ".env.local.example",
   ".tools/x.js",
 ] as const;
 
