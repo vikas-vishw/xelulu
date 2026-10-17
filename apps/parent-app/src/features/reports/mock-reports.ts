@@ -1,90 +1,64 @@
-// Screen 15's mock summaries (Req 19.1, 19.5). Static counts and labels only: nothing here or
-// on the screen computes, infers, scores or ranks (Req 12.4, D14). No advertising, no
-// third-party content and no behavioural inference.
-
-import type { ReportPeriod } from "@xelulu/shared";
+// Screen 15's presentation map (Phase 4 Req 19.4). The four numbers are gone from here: they are
+// counts out of the shared `summariseActivity`, read through the reports In_App_Store
+// (`src/lib/stores/report-store.ts`). What stays is the tile's icon, tone and label.
+//
+// A report is a summary a parent asked for (safety.md §2): nothing here or on the screen profiles
+// a child, infers, scores or ranks, and nothing is used for advertising.
 
 import type { IconName } from "../../components/icon";
 import type { IconTileTone } from "../../components/icon-tile";
 
 import { REPORTS_STRINGS } from "./strings";
 
-/** The screen's two segments. Not the shared `ReportPeriod`. */
+/** The screen's two segments. Not the shared `ReportPeriod`, which has no monthly member. */
 export type ReportPeriodKey = "week" | "month";
 
+/** The four tiles, in the Reference's order. The store counts one value per key. */
+export const REPORT_TILE_KEYS = Object.freeze([
+  "stories-heard",
+  "new-words",
+  "questions-asked",
+  "play-sessions",
+] as const);
+export type ReportTileKey = (typeof REPORT_TILE_KEYS)[number];
+
 export type ReportTile = Readonly<{
-  key: string;
+  key: ReportTileKey;
   icon: IconName;
   /** The tile's colour, as the Reference draws screen 15's four summaries. */
   icon_tone: IconTileTone;
-  /** Already-formatted display value. Never computed. */
+  /** Already-formatted display value, counted by the store. */
   value: string;
   label: string;
 }>;
 
-export type ReportSet = Readonly<{
-  /** `daily | weekly`. `"weekly"` for both sets: the union has no monthly member, so the Month
-   *  segment is a mock aggregate of weekly summaries. Not rendered, and never cast. */
-  period: ReportPeriod;
-  tiles: readonly ReportTile[];
-  interests_label: string;
-}>;
-
-export type ReportsData = Readonly<Record<ReportPeriodKey, ReportSet>>;
-
 const TILES = REPORTS_STRINGS.tiles;
 
-/** The four tiles, in the Reference's order, with one set's four values. */
-function tilesFor(
-  storiesHeard: string,
-  newWords: string,
-  questionsAsked: string,
-  playSessions: string,
-): readonly ReportTile[] {
-  return [
-    {
-      key: "stories-heard",
-      icon: "book-outline",
-      icon_tone: "rose",
-      value: storiesHeard,
-      label: TILES.storiesHeard,
-    },
-    {
-      key: "new-words",
-      icon: "chatbubble-ellipses-outline",
-      icon_tone: "mint",
-      value: newWords,
-      label: TILES.newWords,
-    },
-    {
-      key: "questions-asked",
-      icon: "help-circle-outline",
-      icon_tone: "rose",
-      value: questionsAsked,
-      label: TILES.questionsAsked,
-    },
-    {
-      key: "play-sessions",
-      icon: "game-controller-outline",
-      icon_tone: "amber",
-      value: playSessions,
-      label: TILES.playSessions,
-    },
-  ];
-}
+export type ReportTilePresentation = Readonly<{
+  key: ReportTileKey;
+  icon: IconName;
+  icon_tone: IconTileTone;
+  label: string;
+}>;
 
-const INTERESTS_LABEL = "Dinosaurs, Space, Animals";
-
-export const MOCK_REPORTS: ReportsData = {
-  /** The Reference's four numbers. */
-  week: {
-    period: "weekly",
-    tiles: tilesFor("5", "12", "8", "6"),
-    interests_label: INTERESTS_LABEL,
+export const REPORT_TILE_PRESENTATION: readonly ReportTilePresentation[] = Object.freeze([
+  { key: "stories-heard", icon: "book-outline", icon_tone: "rose", label: TILES.storiesHeard },
+  {
+    key: "new-words",
+    icon: "chatbubble-ellipses-outline",
+    icon_tone: "mint",
+    label: TILES.newWords,
   },
-  month: {
-    period: "weekly",
-    tiles: tilesFor("18", "44", "31", "22"),
-    interests_label: INTERESTS_LABEL,
+  {
+    key: "questions-asked",
+    icon: "help-circle-outline",
+    icon_tone: "rose",
+    label: TILES.questionsAsked,
   },
-};
+  {
+    key: "play-sessions",
+    icon: "game-controller-outline",
+    icon_tone: "amber",
+    label: TILES.playSessions,
+  },
+]);

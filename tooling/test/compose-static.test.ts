@@ -27,10 +27,16 @@ const NODE_SERVICE_PORTS: Record<(typeof NODE_SERVICES)[number], string> = {
   simulator: "127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}",
 };
 // Req 21.7: each service's exact `command`. The gateway also carries the Transcripts_Argument, so
-// the local stack's operator channel shows transcript text (Local_Mode only); the simulator does
-// not take that argument.
+// the local stack's operator channel shows transcript text, and the Content_Admin_Argument, so the
+// Content page's writes are accepted (both Local_Mode only); the simulator takes neither.
 const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly string[]> = {
-  gateway: ["node", "dist/index.js", "--listen-all-interfaces", "--operator-transcripts"],
+  gateway: [
+    "node",
+    "dist/index.js",
+    "--listen-all-interfaces",
+    "--operator-transcripts",
+    "--content-admin",
+  ],
   simulator: ["node", "dist/index.js", "--listen-all-interfaces"],
 };
 

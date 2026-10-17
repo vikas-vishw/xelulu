@@ -1,5 +1,7 @@
-// Screen 8 of the Reference: Play & Adventure. Mock data and local state only, no network
-// call and no environment read (Req 10.1-10.6, 22.1, 22.2).
+// Screen 8 of the Reference: Play & Adventure. The cards come from the content In_App_Store over
+// the shared Starter_Content, in memory: no network call and no environment read (Phase 4 Req
+// 19.3, Phase 2.2 Req 10.1-10.6, 22.1, 22.2). Only `active` items are offered — the store filters
+// them — so a draft never reaches this screen.
 //
 // Nothing here starts an activity: pressing a card sets one muted line saying the robot starts
 // it, and never navigates (Req 10.5).
@@ -12,9 +14,9 @@ import { MediaCard } from "../../components/media-card";
 import { Screen } from "../../components/screen";
 import { ScreenHeader } from "../../components/screen-header";
 import { SegmentedTabs, type SegmentedOption } from "../../components/segmented-tabs";
+import { APP_CONTENT_STORE, type AppContentStore } from "../../lib/stores/content-store";
 import { SCREEN_HEADER_NAME } from "../shell/strings";
 
-import { MOCK_PLAY, type PlayData } from "./mock-play";
 import { PLAY_STRINGS } from "./strings";
 
 /** "all" plus the three `PlayCategory` values, in the Reference's order. */
@@ -26,9 +28,9 @@ const SEGMENTS: readonly SegmentedOption[] = SEGMENT_KEYS.map((key) => ({
   label: PLAY_STRINGS.segments[key],
 }));
 
-export type PlayScreenProps = Readonly<{ data?: PlayData }>;
+export type PlayScreenProps = Readonly<{ store?: AppContentStore }>;
 
-export function PlayScreen({ data = MOCK_PLAY }: PlayScreenProps): React.JSX.Element {
+export function PlayScreen({ store = APP_CONTENT_STORE }: PlayScreenProps): React.JSX.Element {
   const [category, setCategory] = useState<SegmentKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -41,8 +43,8 @@ export function PlayScreen({ data = MOCK_PLAY }: PlayScreenProps): React.JSX.Ele
     setNotice(null);
   };
 
-  const visible =
-    category === "all" ? data.items : data.items.filter((item) => item.category === category);
+  const items = store.playItems();
+  const visible = category === "all" ? items : items.filter((item) => item.category === category);
 
   return (
     <Screen scroll>

@@ -300,21 +300,72 @@ describe("placeholder screens and package boundaries", () => {
       }
     });
 
-    it("imports @xelulu/shared with import type only (Req 8.3)", () => {
+    /**
+     * The In_App_Store modules: the only app files allowed to import a runtime VALUE from
+     * `@xelulu/shared` (Phase 4 Req 19.7, C27). Every other file in the app keeps `import type`,
+     * which is erased at compile time; these four are what pull the package — and `zod` with it —
+     * into the Metro bundle and the Jest module graph, which is why the allow-list is named here
+     * rather than left to a convention.
+     */
+    const IN_APP_STORE_FILES: ReadonlySet<string> = new Set([
+      "apps/parent-app/src/lib/stores/content-store.ts",
+      "apps/parent-app/src/lib/stores/mock-activity.ts",
+      "apps/parent-app/src/lib/stores/report-store.ts",
+      "apps/parent-app/src/lib/stores/routine-store.ts",
+    ]);
+
+    /** The runtime names those files may import: the Starter_Content and the report arithmetic. */
+    const IN_APP_STORE_VALUE_NAMES: ReadonlySet<string> = new Set([
+      "CONTENT_CATEGORIES",
+      "createStarterContent",
+      "createStarterRoutines",
+      "reportWindow",
+      "summariseActivity",
+    ]);
+
+    /** The names of a `{ a, b as c }` import clause, with any `type` specifier dropped. */
+    function namedImports(clause: string): string[] {
+      const braces = /\{([^}]*)\}/.exec(clause);
+      return (braces?.[1] ?? "")
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0 && !/^type\s/.test(part))
+        .map((part) => (part.split(/\s+as\s+/)[0] ?? part).trim());
+    }
+
+    it("imports @xelulu/shared as a value only in the In_App_Stores (Req 8.3, 19.7)", () => {
       expect(sourcePaths.length).toBeGreaterThan(20);
-      const clauses: string[] = [];
+      // Every allow-listed file exists, so the list cannot go stale unnoticed.
+      expect(sourcePaths).toEqual(expect.arrayContaining([...IN_APP_STORE_FILES]));
+
+      const typeClauses: string[] = [];
+      const valueFiles = new Set<string>();
       for (const path of sourcePaths) {
         const src = read(path);
         for (const match of src.matchAll(
           /\bimport\s+([\s\S]*?)\bfrom\s*(["'`])@xelulu\/shared(?:\/[^"'`]*)?\2/g,
         )) {
           const clause = (match[1] ?? "").trim();
-          clauses.push(`${path}: ${clause}`);
-          expect(clause, `${path} imports @xelulu/shared as a value`).toMatch(/^type\b/);
+          if (/^type\b/.test(clause)) {
+            typeClauses.push(`${path}: ${clause}`);
+            continue;
+          }
+          expect(
+            IN_APP_STORE_FILES.has(path),
+            `${path} imports @xelulu/shared as a value outside the In_App_Stores`,
+          ).toBe(true);
+          valueFiles.add(path);
+          for (const name of namedImports(clause)) {
+            expect(
+              IN_APP_STORE_VALUE_NAMES.has(name),
+              `${path} imports the runtime name ${name}, which is not on the store allow-list`,
+            ).toBe(true);
+          }
         }
       }
-      // At least one such import exists, so the check is not vacuous.
-      expect(clauses.length).toBeGreaterThan(0);
+      // Both halves are non-vacuous: type-only imports exist, and so does a store value import.
+      expect(typeClauses.length).toBeGreaterThan(0);
+      expect(valueFiles.size).toBeGreaterThan(0);
     });
 
     /**
@@ -518,6 +569,58 @@ describe("placeholder screens and package boundaries", () => {
         expect(css, toRepoPath(abs)).not.toMatch(/\b(?:animation|transition)\b/i);
         expect(css, toRepoPath(abs)).not.toMatch(/@(?:-[a-z]+-)?keyframes\b/i);
       }
+    });
+
+    /**
+     * The Operator_Stream route plus the twelve Operator_Content_Routes (Phase 4 Req 17.7, 20.4).
+     * Restated here rather than imported, because `tooling/` reads the repo with fs and the list
+     * is the point of the check: the console may request these thirteen paths and nothing else.
+     */
+    const CONSOLE_REQUEST_PATHS: ReadonlySet<string> = new Set([
+      "/v1/stream",
+      "/v1/content",
+      "/v1/grandma",
+      "/v1/routines",
+      "/v1/reports",
+      "/v1/content/create",
+      "/v1/content/update",
+      "/v1/content/status",
+      "/v1/grandma/consent",
+      "/v1/grandma/recording",
+      "/v1/grandma/schedule",
+      "/v1/grandma/call",
+      "/v1/routines/run",
+    ]);
+
+    /** The one module allowed a `fetch` call site; `use-console-stream.ts` opens an EventSource. */
+    const CONSOLE_FETCH_FILE = "apps/admin/src/content/content-client.ts";
+
+    // Phase 4 C23: before this phase the console's only request was the stream and nothing
+    // statically forbade a second one. It now calls `fetch` twelve ways, so the rule needs a real
+    // enforcer rather than a sentence in a requirement.
+    it("requests only the stream and the content routes, and calls fetch in one module", () => {
+      const tsFiles = srcFiles.filter((abs) => [".ts", ".tsx"].includes(extname(abs)));
+      expect(tsFiles.map(toRepoPath)).toContain(CONSOLE_FETCH_FILE);
+
+      const seen = new Set<string>();
+      const fetchFiles: string[] = [];
+      for (const abs of tsFiles) {
+        const where = toRepoPath(abs);
+        const { code, strings } = scanSource(readFileSync(abs, "utf8"));
+        for (const value of strings) {
+          if (!/^\/[A-Za-z0-9]/.test(value)) continue;
+          expect(
+            CONSOLE_REQUEST_PATHS.has(value),
+            `${where} holds the request path ${value}, which is not the stream or a content route`,
+          ).toBe(true);
+          seen.add(value);
+        }
+        if (/(?<![\w$.])fetch\s*\(/.test(code)) fetchFiles.push(where);
+      }
+
+      // Not vacuous: the thirteen paths are all written down, in the two client modules only.
+      expect([...seen].sort()).toEqual([...CONSOLE_REQUEST_PATHS].sort());
+      expect(fetchFiles).toEqual([CONSOLE_FETCH_FILE]);
     });
 
     it("the built bundle in apps/admin/dist contains no Panel_Key name", () => {

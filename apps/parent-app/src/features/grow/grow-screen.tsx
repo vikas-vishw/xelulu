@@ -1,8 +1,11 @@
 // Screen 9 of the Reference: Grow / Learning Insights. Mock data and local state only, no
 // network call and no environment read (Req 11.1-11.6, 22.1, 22.2).
 //
-// Nothing on this screen computes, scores, infers or ranks anything about a child: every
-// number, label and time is a static string in `mock-grow.ts` (Req 11.6, D14).
+// The four metric values and the interest cards come from the reports In_App_Store (Phase 4 Req
+// 19.4): counts out of the shared `summariseActivity`, computed on request. Nothing on this
+// screen scores, ranks, infers or predicts anything about a child, and an interest card names a
+// Content_Category the robot played from rather than a trait (Req 19.8, D14). The milestone rows
+// stay a Mock_Module.
 //
 // One deviation from the frozen Reference, reported: the reports entry row at the bottom is an
 // addition the Reference does not draw (D24c). Without it, `/reports` would be reachable only
@@ -20,6 +23,7 @@ import { Screen } from "../../components/screen";
 import { SectionTitle } from "../../components/section-title";
 import { SegmentedTabs, type SegmentedOption } from "../../components/segmented-tabs";
 import { Illustration } from "../../illustrations/illustration";
+import { APP_REPORT_STORE, type AppReportStore } from "../../lib/stores/report-store";
 import { tokens } from "../../theme/theme";
 import { ROUTE_PATH } from "../shell/routes";
 import { ScreenTitle } from "../shell/screen-title";
@@ -91,15 +95,21 @@ function InterestRow({ interest }: Readonly<{ interest: GrowInterest }>): React.
   );
 }
 
-export type GrowScreenProps = Readonly<{ data?: GrowData }>;
+export type GrowScreenProps = Readonly<{ data?: GrowData; store?: AppReportStore }>;
 
-export function GrowScreen({ data = MOCK_GROW }: GrowScreenProps): React.JSX.Element {
+export function GrowScreen({
+  data = MOCK_GROW,
+  store = APP_REPORT_STORE,
+}: GrowScreenProps): React.JSX.Element {
   const [segment, setSegment] = useState<SegmentKey>("overview");
 
   const onSegmentChange = (key: string): void => {
     const next = SEGMENT_KEYS.find((candidate) => candidate === key);
     if (next !== undefined) setSegment(next);
   };
+
+  const metrics = store.growMetrics();
+  const interests = store.growInterests();
 
   return (
     <Screen scroll>
@@ -124,7 +134,7 @@ export function GrowScreen({ data = MOCK_GROW }: GrowScreenProps): React.JSX.Ele
       {segment === "overview" ? (
         <>
           {/* One Card per metric row, with a visible gap, as the Reference draws them. */}
-          {data.overview.map((metric) => (
+          {metrics.map((metric) => (
             <Card key={metric.key} className="mt-3">
               <MetricRow
                 icon={metric.icon}
@@ -139,7 +149,7 @@ export function GrowScreen({ data = MOCK_GROW }: GrowScreenProps): React.JSX.Ele
 
           <SectionTitle className="mt-6">{GROW_STRINGS.currentInterests}</SectionTitle>
           <View className="mt-3 flex-row" style={ROW_GAP}>
-            {data.interests.map((interest) => (
+            {interests.map((interest) => (
               <InterestTile key={interest.key} interest={interest} />
             ))}
           </View>
@@ -147,7 +157,7 @@ export function GrowScreen({ data = MOCK_GROW }: GrowScreenProps): React.JSX.Ele
       ) : null}
 
       {segment === "interests"
-        ? data.interests.map((interest) => <InterestRow key={interest.key} interest={interest} />)
+        ? interests.map((interest) => <InterestRow key={interest.key} interest={interest} />)
         : null}
 
       {segment === "milestones" ? (

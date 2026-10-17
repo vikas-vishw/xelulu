@@ -58,13 +58,14 @@ $env:Path = "c:\xelulu\.tools\node-v24.21.0-win-x64;" + $env:Path
 
 ## Run each piece
 
-| Command                | Expected result                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm start:app`       | Scan the QR code with Expo Go. The phone shows the Home dashboard.                                                       |
-| `pnpm dev:admin`       | `http://127.0.0.1:5173` shows the live console (see "Watch the simulator in the admin console").                         |
-| `pnpm start:gateway`   | Starts the service; it keeps running until stopped (needs a configured `.env`, loaded into the shell environment).       |
-| `pnpm start:simulator` | Starts the service; it keeps running until stopped (needs a configured `.env`, loaded into the shell environment).       |
-| `docker compose up`    | The EMQX, gateway and simulator containers start and go healthy, with no `.env` needed; they keep running until stopped. |
+| Command                  | Expected result                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm start:app`         | Scan the QR code with Expo Go. The phone shows the Home dashboard. Run `pnpm build` first.                               |
+| `pnpm dev:admin`         | `http://127.0.0.1:5173` shows the live console (see "Watch the simulator in the admin console").                         |
+| `pnpm dev:admin:content` | The same console with the Content page's writes proxied (see "Content, stories, Grandma and routines locally").          |
+| `pnpm start:gateway`     | Starts the service; it keeps running until stopped (needs a configured `.env`, loaded into the shell environment).       |
+| `pnpm start:simulator`   | Starts the service; it keeps running until stopped (needs a configured `.env`, loaded into the shell environment).       |
+| `docker compose up`      | The EMQX, gateway and simulator containers start and go healthy, with no `.env` needed; they keep running until stopped. |
 
 Without a valid configuration the gateway and simulator write one config error line naming the offending keys (never their values) and exit with a non-zero code.
 
@@ -163,7 +164,7 @@ The admin console reads the gateway's live stream (`/v1/stream`) through its dev
 
 If `GATEWAY_OPERATOR_PORT` is set to something that is not a port, `pnpm dev:admin` prints one warning line and the console stays on "Reconnecting". Unset or empty is not an error: the proxy then uses the same 8090 the Compose stack defaults to.
 
-Security: the console is internal only and read-only; it sends no commands. The gateway stream, the simulator panel and the admin dev server stay unauthenticated. Both surfaces are published on host loopback only, guarded by their unchanged Host and Origin checks, and the stream carries only IDs, enums, counts and times — with one exception: when the gateway runs with `--operator-transcripts`, its `turn` events also carry that turn's transcript and reply text (see the next section). No log entry carries either, under any argument.
+Security: the console is internal only. `pnpm dev:admin` is read-only — it proxies the stream and the four content reads and nothing else — and writes exist only in content-admin mode (see "Content, stories, Grandma and routines locally"). The gateway stream, the simulator panel and the admin dev server stay unauthenticated. Both surfaces are published on host loopback only, guarded by their unchanged Host and Origin checks, and the stream carries only IDs, enums, counts and times — with one exception: when the gateway runs with `--operator-transcripts`, its `turn` events also carry that turn's transcript and reply text (see the next section). No log entry carries either, under any argument.
 
 ## Run a conversation turn locally
 
@@ -176,6 +177,34 @@ A turn runs through the gateway's voice brain: speech to text, the safety layer 
 Transcript and reply text is off by default. The gateway shows it only when it is started with `--operator-transcripts`, which it accepts in Local_Mode on loopback only; local Compose passes that argument to the gateway service, so a `docker compose up` stack has it on. Without it the page still shows every decision, tool and timing, plus the text lengths and a note that text is off.
 
 Transcripts live in the gateway's memory only. They are never written to a log line, a file or a database, they are capped per device, and they are gone when the gateway restarts.
+
+## Content, stories, Grandma and routines locally
+
+The gateway holds a curated starter library — original retellings from the Panchatantra, Jataka, Tenali Raman and Akbar-Birbal traditions, plus songs and learning activities — the six routine templates, the word of the day, the Grandma records and the activity a report is counted from. The console's **Content** page lists and edits all of it.
+
+Writes are off by default and are Local_Mode only. The gateway accepts them only when it is started with `--content-admin`, which it ignores outside Local_Mode; local Compose passes that argument to the gateway service, so a `docker compose up` stack has it on. The console's dev server proxies the write routes only in content-admin mode:
+
+```sh
+pnpm dev:admin          # the stream and the four content reads; no write is proxied
+pnpm dev:admin:content  # the same, plus the eight write routes
+```
+
+1. Bring the stack up (`docker compose up --build`), then run `pnpm build` and `pnpm dev:admin:content`.
+2. Open `http://127.0.0.1:5173/#/content`. The five sections — Stories, Games, Songs, Learning and Grandma — list what the gateway holds, each item with its status and its gate verdict.
+3. Add or edit an item. Every write lands as a **draft**: an item becomes Active only when the output safety guard passes its title, every step text and every choice prompt at each age stage and language it declares. A refused activation shows the rule, the age stage and the language as text, and the item stays a draft.
+4. In the Grandma section, record a consent record first, then add a recording against it and schedule it. A recording cannot exist without a live consent record. **That control records the _shape_ of a consent record for development. It is not verifiable parental consent under the DPDP Act, which arrives in Phase 5.** No Grandma audio exists anywhere in this phase: a recording is metadata, a consent id and an opaque handle nothing dereferences, and text-to-speech stands in for playback.
+5. Run a routine with the Run control. Every command it sends goes through the same device policy gate a turn's commands do, so quiet hours, the play limit and the movement toggle are checked before anything is published, and an ack reason is final. During quiet hours the answer is a refusal with nothing sent, which is the gate working rather than a failure.
+
+The same twelve routes are reachable from the CLI with no browser: `docker compose exec gateway node dist/cli.js content`, `grandma`, `routines`, `reports`, and the write operations `content-create`, `content-update`, `content-status`, `grandma-consent`, `grandma-recording`, `grandma-schedule`, `grandma-call` and `routine-run`.
+
+Known limits of this phase, all of them in-memory:
+
+- Content, consent records, Grandma records, routine state and activity live in the gateway's memory. They are gone when it restarts; the starter library is re-seeded, nothing else is. Supabase arrives in Phase 5.
+- A report counts only the activity records still held under the store's capacity, so an older one has been dropped rather than summarised.
+- A draft submitted over a route is bounded by the operator surface's unchanged 8 KiB body cap, so the console's editor takes few, short steps.
+- Content titles are `en-IN` only until Phase 5: a title is one string, not a localised map, and it shows unchanged in either app language.
+- The word of the day is one entry per language, so the day's index is shared across children and the entry is shared per language.
+- `pnpm build` must run before `pnpm start:app`. The parent app's Play, Grow, Reports and Routines screens read the shared starter library and the report arithmetic at runtime, and resolve `@xelulu/shared` through its built output; `pnpm start:app` does not build.
 
 ## Notes
 

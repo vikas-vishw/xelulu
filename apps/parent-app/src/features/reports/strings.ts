@@ -17,6 +17,8 @@ export const REPORTS_STRINGS = {
   /** Req 12.3: the screen says outright what a report is and is not. */
   purposeNote:
     "Reports are summaries you ask for. Xelulu does not profile your child, and nothing here is used for advertising.",
+  /** The line under the interests heading when the period's summary counted no category. */
+  interestsEmpty: "Nothing yet.",
   tiles: {
     storiesHeard: "Stories heard",
     newWords: "New words",

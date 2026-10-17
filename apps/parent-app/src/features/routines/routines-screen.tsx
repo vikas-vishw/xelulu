@@ -1,5 +1,6 @@
-// Screen 10 of the Reference: Routines. Mock data and local state only, no network call and
-// no environment read (Req 13.1-13.6, 22.1, 22.2).
+// Screen 10 of the Reference: Routines. The rows come from the routines In_App_Store over the
+// same shared Starter_Content templates the Gateway seeds from, in memory: no network call and no
+// environment read (Phase 4 Req 19.5, Phase 2.2 Req 13.1-13.6, 22.1, 22.2).
 //
 // Nothing here schedules anything or sends a command: a toggle flips one local row, and the
 // add form appends one local row that is forgotten on reload (D10).
@@ -17,11 +18,12 @@ import { Card } from "../../components/card";
 import { ListRow } from "../../components/list-row";
 import { Screen } from "../../components/screen";
 import { TextField } from "../../components/text-field";
+import { APP_ROUTINE_STORE, type AppRoutineStore } from "../../lib/stores/routine-store";
 import { isBlank } from "../../lib/text";
 import { ScreenTitle } from "../shell/screen-title";
 import { SCREEN_HEADER_NAME } from "../shell/strings";
 
-import { MOCK_ROUTINES, type RoutineRow, type RoutinesData } from "./mock-routines";
+import { type RoutineRow } from "./mock-routines";
 import { ROUTINES_STRINGS } from "./strings";
 
 const NAME_MAX = 40;
@@ -33,10 +35,12 @@ const NEW_ROW_ICON = "time-outline";
 /** A locally added row keeps the kit's default tile colour, for the same reason. */
 const NEW_ROW_TONE = "beige";
 
-export type RoutinesScreenProps = Readonly<{ data?: RoutinesData }>;
+export type RoutinesScreenProps = Readonly<{ store?: AppRoutineStore }>;
 
-export function RoutinesScreen({ data = MOCK_ROUTINES }: RoutinesScreenProps): React.JSX.Element {
-  const [rows, setRows] = useState<readonly RoutineRow[]>(data.rows);
+export function RoutinesScreen({
+  store = APP_ROUTINE_STORE,
+}: RoutinesScreenProps): React.JSX.Element {
+  const [rows, setRows] = useState<readonly RoutineRow[]>(store.routines().rows);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [time, setTime] = useState("");

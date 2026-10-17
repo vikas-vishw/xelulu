@@ -19,18 +19,29 @@ export const GROW_STRINGS = {
     title: "This Week with Xelulu",
     subtitle: "Reports and summaries",
   },
-  /** Static labels only. Nothing computes, scores, infers or ranks (Req 11.6, D14). */
+  /**
+   * The four metric labels. The value beside each one is a count out of the shared
+   * `summariseActivity` (Phase 4 Req 19.4); nothing scores, infers, ranks or predicts.
+   */
   metrics: {
-    language: { title: "Language", subtitle: "New words this week", value: "+12" },
-    reading: { title: "Reading", subtitle: "Stories together", value: "4" },
-    curiosity: { title: "Curiosity", subtitle: "Questions & exploration", value: "8" },
-    physicalPlay: { title: "Physical Play", subtitle: "Movement & activity", value: "5" },
+    language: { title: "Language", subtitle: "New words this week" },
+    reading: { title: "Reading", subtitle: "Stories together" },
+    curiosity: { title: "Curiosity", subtitle: "Questions & exploration" },
+    physicalPlay: { title: "Physical Play", subtitle: "Movement & activity" },
   },
-  /** The interest label is the card's heading; the detail line sits under it. */
-  interests: {
-    dinosaurs: { label: "Dinosaurs", detail: "6 stories, 12 questions this week" },
-    animals: { label: "Animals", detail: "4 stories, 9 questions this week" },
-    space: { label: "Space", detail: "3 stories, 7 questions this week" },
+  /**
+   * One label and one line per Content_Category (Phase 4 Req 19.4). The interest cards name the
+   * categories the week's activity touched: content metadata, never a trait or a ranking.
+   */
+  categories: {
+    stories: { label: "Stories", detail: "Stories and tales" },
+    songs: { label: "Songs", detail: "Songs and rhymes" },
+    animals: { label: "Animals", detail: "Animals and birds" },
+    maths: { label: "Numbers", detail: "Counting and shapes" },
+    world: { label: "Our World", detail: "Places and people" },
+    feelings: { label: "Feelings", detail: "Calm and comfort" },
+    manners: { label: "Manners", detail: "Please and thank you" },
+    games: { label: "Games", detail: "Moving and playing" },
   },
   milestones: {
     firstSentence: { title: "First full sentence", subtitle: "Language", timeLabel: "2 weeks ago" },

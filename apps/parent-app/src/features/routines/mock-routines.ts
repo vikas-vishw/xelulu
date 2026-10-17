@@ -1,5 +1,14 @@
-// Screen 10's mock routines (Req 19.1, 19.3, 19.5). Display labels only: every time is a
-// static string, nothing is scheduled, and no command reaches a robot from here.
+// Screen 10's presentation map (Phase 4 Req 19.5). The row list itself is gone: the rows come
+// from the routines In_App_Store over the shared Starter_Content routine templates
+// (`src/lib/stores/routine-store.ts`), which is the same seed the Gateway's Routine_Store reads.
+//
+// A Routine_Template carries a `routine_id`, a lowercase `name`, an `HH:MM` `at`, `enabled` and a
+// behaviour id — and none of a title case, a subtitle, an icon, a tone or a 12-hour label. All
+// five of those live here and in `strings.ts`, keyed by the template's `routine_id`, so the app
+// invents no row text and a template with no entry here renders no row at all.
+//
+// Display labels only: every time is a static string, nothing is scheduled, and no command
+// reaches a robot from here.
 
 import type { IconName } from "../../components/icon";
 import type { IconTileTone } from "../../components/icon-tile";
@@ -21,31 +30,23 @@ export type RoutinesData = Readonly<{ rows: readonly RoutineRow[] }>;
 
 const ROWS = ROUTINES_STRINGS.rows;
 
-/** One mock row from its strings entry. All six start on, as the Reference draws them. */
-function row(
-  routineId: string,
-  icon: IconName,
-  iconTone: IconTileTone,
-  text: Readonly<{ title: string; subtitle: string; timeLabel: string }>,
-): RoutineRow {
-  return {
-    routine_id: routineId,
-    icon,
-    icon_tone: iconTone,
-    title: text.title,
-    subtitle: text.subtitle,
-    time_label: text.timeLabel,
-    enabled: true,
-  };
-}
+/** One Reference row's presentation: its glyph, its tile colour and its three strings. */
+export type RoutinePresentation = Readonly<{
+  icon: IconName;
+  tone: IconTileTone;
+  /** The row's title case, its subtitle and its 12-hour label, from `strings.ts`. */
+  text: Readonly<{ title: string; subtitle: string; timeLabel: string }>;
+}>;
 
-export const MOCK_ROUTINES: RoutinesData = {
-  rows: [
-    row("routine_mock_morning", "sunny-outline", "amber", ROWS.morning),
-    row("routine_mock_brushing", "brush-outline", "sky", ROWS.brushing),
-    row("routine_mock_meals", "restaurant-outline", "rose", ROWS.meals),
-    row("routine_mock_play-time", "game-controller-outline", "amber", ROWS.playTime),
-    row("routine_mock_wind-down", "leaf-outline", "lavender", ROWS.windDown),
-    row("routine_mock_bedtime", "moon-outline", "lavender", ROWS.bedtime),
-  ],
-};
+/**
+ * The six Reference rows, keyed by the Starter_Content template's `routine_id` (Req 19.5). The
+ * camelCase `strings.ts` keys are reached through this map and are deliberately not renamed.
+ */
+export const ROUTINE_PRESENTATION: Readonly<Record<string, RoutinePresentation>> = Object.freeze({
+  morning: { icon: "sunny-outline", tone: "amber", text: ROWS.morning },
+  brushing: { icon: "brush-outline", tone: "sky", text: ROWS.brushing },
+  meals: { icon: "restaurant-outline", tone: "rose", text: ROWS.meals },
+  play_time: { icon: "game-controller-outline", tone: "amber", text: ROWS.playTime },
+  wind_down: { icon: "leaf-outline", tone: "lavender", text: ROWS.windDown },
+  bedtime: { icon: "moon-outline", tone: "lavender", text: ROWS.bedtime },
+});

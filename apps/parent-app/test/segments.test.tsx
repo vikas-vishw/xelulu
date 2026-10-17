@@ -1,12 +1,16 @@
-// The segmented screens of Phase 2.2: screens 8 Play, 9 Grow and 15 Reports, screen 12 Family,
-// screen 14 Privacy & Memory and screen 16a Notifications (Req 26.7, 26.8). Smoke and
-// key-interaction only, example-based, no fast-check (Req 26.1).
+﻿// The segmented screens that still run on a Mock_Module: screen 12 Family, screen 14 Privacy &
+// Memory and screen 16a Notifications (Req 26.7, 26.8). Smoke and key-interaction only,
+// example-based, no fast-check (Req 26.1).
+//
+// Screens 8 Play, 9 Grow and 15 Reports moved to `play-screen.test.tsx`, `grow-screen.test.tsx`
+// and `reports-screen.test.tsx` with Phase 4: they run on an In_App_Store now, and each suite
+// injects one.
 //
 // Property 10: a segmented control filters or swaps. Property 4: state is never colour alone.
 //
-// Every "exactly one option selected" assertion is scoped inside the screen's own `tablist`:
-// the Tab_Bar's selected tab carries the same `tab` role, so a whole-screen count is false on
-// `/play` and `/grow`.
+// Every "exactly one option selected" assertion is scoped inside the screen's own `tablist`
+// through the shared `expectOneSelectedSegment` helper: the Tab_Bar's selected tab carries the
+// same `tab` role, so a whole-screen count is false on `/play` and `/grow`.
 
 import { describe, expect, it } from "@jest/globals";
 import { within } from "@testing-library/react-native";
@@ -18,19 +22,14 @@ import { SafeAreaProvider, type Metrics } from "react-native-safe-area-context";
 import { memberCardTestId } from "../src/features/family/family-screen";
 import { MOCK_FAMILY, type FamilyMember } from "../src/features/family/mock-family";
 import { childLine, FAMILY_STRINGS } from "../src/features/family/strings";
-import { GROW_STRINGS } from "../src/features/grow/strings";
-import { PlayScreen } from "../src/features/play/play-screen";
-import { PLAY_STRINGS } from "../src/features/play/strings";
 import { MOCK_NOTIFICATIONS } from "../src/features/notifications/mock-notifications";
 import { NotificationsScreen } from "../src/features/notifications/notifications-screen";
 import { NOTIFICATION_STRINGS } from "../src/features/notifications/strings";
 import { MOCK_PRIVACY } from "../src/features/privacy/mock-privacy";
 import { PRIVACY_STRINGS } from "../src/features/privacy/strings";
-import { MOCK_REPORTS } from "../src/features/reports/mock-reports";
-import { REPORTS_STRINGS } from "../src/features/reports/strings";
-import { SEGMENT_STATE } from "../src/components/segmented-tabs";
 import { ROUTE_PATH } from "../src/features/shell/routes";
-import { MOCK_IDENTITY } from "../src/lib/mock-identity";
+
+import { expectOneSelectedSegment, pressSegment } from "./support/segments";
 
 /** The real route tree, as an absolute path so the test does not depend on the Jest cwd. */
 const APP_DIR = join(__dirname, "..", "app");
@@ -47,194 +46,6 @@ function Wrapper({ children }: Readonly<{ children?: ReactNode }>): React.JSX.El
 function openApp(initialUrl: string): { getPathname: () => string } {
   return renderRouter(APP_DIR, { initialUrl, wrapper: Wrapper });
 }
-
-/**
- * One selected option inside the screen's own segmented control, never two, and that option is
- * the only filled one (Phase 2 cleanup, fix 1).
- *
- * The scope is resolved by the feature's `segmentsLabel`, which is the `tablist` container's
- * accessibility label. It is resolved with `getByLabelText` rather than
- * `getByRole("tablist", { name })`, because RNTL's role query matches only elements whose
- * `accessible` prop is set, and `segmented-tabs.tsx` deliberately leaves the container's unset
- * so each option stays an accessibility element of its own. The scoping intent is identical
- * either way: the Tab_Bar's selected tab shares the `tab` role, so a whole-screen count would
- * be false on `/play` and `/grow`.
- */
-function expectOneSelectedSegment(segmentsLabel: string): void {
-  const list = within(screen.getByLabelText(segmentsLabel, { exact: true }));
-  const selected = list.getAllByRole("tab", { selected: true });
-  expect(selected).toHaveLength(1);
-
-  const fill = `bg-${SEGMENT_STATE.selected.bgToken}`;
-  const filled = list
-    .getAllByRole("tab")
-    .filter((option) => String(option.props.className).includes(fill));
-  expect(filled).toHaveLength(1);
-  expect(filled[0]).toBe(selected[0]);
-}
-
-const pressSegment = (label: string): void => {
-  fireEvent.press(screen.getByRole("tab", { name: label }));
-};
-
-describe("screen 8, Play & Adventure", () => {
-  const ITEMS = PLAY_STRINGS.items;
-
-  it("shows the Reference's four cards under All (Req 10.1, 10.2)", () => {
-    openApp(ROUTE_PATH.play);
-
-    expect(screen.getByRole("header", { name: "Play with Xelulu" })).toBeOnTheScreen();
-    for (const item of [ITEMS.animalAdventure, ITEMS.treasureHunt, ITEMS.dance, ITEMS.storyTime]) {
-      expect(screen.getByText(item.title)).toBeOnTheScreen();
-      expect(screen.getByText(item.subtitle)).toBeOnTheScreen();
-    }
-    expectOneSelectedSegment(PLAY_STRINGS.segmentsLabel);
-  });
-
-  // Property 10: selecting a segment filters the list to that category.
-  it.each([
-    [PLAY_STRINGS.segments.games, ITEMS.animalAdventure.title, ITEMS.storyTime.title],
-    [PLAY_STRINGS.segments.stories, ITEMS.storyTime.title, ITEMS.animalAdventure.title],
-    [PLAY_STRINGS.segments.learning, ITEMS.countingFun.title, ITEMS.animalAdventure.title],
-  ])("shows only the %s cards (Req 10.3)", (segment, shown, hidden) => {
-    openApp(ROUTE_PATH.play);
-
-    pressSegment(segment);
-
-    expect(screen.getByText(shown)).toBeOnTheScreen();
-    expect(screen.queryByText(hidden)).toBeNull();
-    expectOneSelectedSegment(PLAY_STRINGS.segmentsLabel);
-  });
-
-  it("shows every card again under All (Req 10.3)", () => {
-    openApp(ROUTE_PATH.play);
-
-    pressSegment(PLAY_STRINGS.segments.stories);
-    pressSegment(PLAY_STRINGS.segments.all);
-
-    expect(screen.getByText(ITEMS.animalAdventure.title)).toBeOnTheScreen();
-    expect(screen.getByText(ITEMS.countingFun.title)).toBeOnTheScreen();
-  });
-
-  it("shows the later-phase line on a card press, and navigates nowhere (Req 10.5)", () => {
-    const router = openApp(ROUTE_PATH.play);
-
-    expect(screen.queryByText(PLAY_STRINGS.startsFromRobot)).toBeNull();
-
-    fireEvent.press(
-      screen.getByRole("button", {
-        name: `${ITEMS.animalAdventure.title}, ${ITEMS.animalAdventure.subtitle}`,
-      }),
-    );
-
-    expect(screen.getByText(PLAY_STRINGS.startsFromRobot)).toBeOnTheScreen();
-    expect(router.getPathname()).toBe(ROUTE_PATH.play);
-  });
-
-  it("shows the empty line when the injected module holds no card (Req 10.4)", () => {
-    renderRouter(
-      { play: () => <PlayScreen data={{ items: [] }} /> },
-      { initialUrl: ROUTE_PATH.play, wrapper: Wrapper },
-    );
-
-    expect(screen.getByText(PLAY_STRINGS.nothingHere)).toBeOnTheScreen();
-  });
-});
-
-describe("screen 9, Grow / Learning Insights", () => {
-  const METRIC = GROW_STRINGS.metrics;
-
-  it("shows the Overview panel and the current interests (Req 11.1, 11.2)", () => {
-    openApp(ROUTE_PATH.grow);
-
-    expect(screen.getByRole("header", { name: "Growing Together" })).toBeOnTheScreen();
-    expect(screen.getByText(GROW_STRINGS.subheader)).toBeOnTheScreen();
-    for (const metric of [METRIC.language, METRIC.reading, METRIC.curiosity, METRIC.physicalPlay]) {
-      expect(
-        screen.getByLabelText(`${metric.value} ${metric.title}`, { exact: true }),
-      ).toBeOnTheScreen();
-    }
-    expect(screen.getByRole("header", { name: GROW_STRINGS.currentInterests })).toBeOnTheScreen();
-    expect(screen.getByText(GROW_STRINGS.interests.dinosaurs.label)).toBeOnTheScreen();
-    expectOneSelectedSegment(GROW_STRINGS.segmentsLabel);
-  });
-
-  // Property 10: selecting a segment swaps the panel.
-  it("swaps to the Interests panel with its detail lines (Req 11.3, 11.4)", () => {
-    openApp(ROUTE_PATH.grow);
-
-    pressSegment(GROW_STRINGS.segments.interests);
-
-    expect(screen.getByText(GROW_STRINGS.interests.dinosaurs.detail)).toBeOnTheScreen();
-    expect(screen.queryByText(METRIC.language.subtitle)).toBeNull();
-    expectOneSelectedSegment(GROW_STRINGS.segmentsLabel);
-  });
-
-  it("swaps to the Milestones panel with its times (Req 11.3, 11.4)", () => {
-    openApp(ROUTE_PATH.grow);
-
-    pressSegment(GROW_STRINGS.segments.milestones);
-
-    expect(screen.getByText(GROW_STRINGS.milestones.firstSentence.title)).toBeOnTheScreen();
-    expect(screen.getByText(GROW_STRINGS.milestones.firstSentence.timeLabel)).toBeOnTheScreen();
-    expect(screen.queryByText(GROW_STRINGS.interests.dinosaurs.detail)).toBeNull();
-    expectOneSelectedSegment(GROW_STRINGS.segmentsLabel);
-  });
-
-  it("keeps the reports row on every segment (Req 11.5)", () => {
-    openApp(ROUTE_PATH.grow);
-
-    for (const segment of [
-      GROW_STRINGS.segments.interests,
-      GROW_STRINGS.segments.milestones,
-      GROW_STRINGS.segments.overview,
-    ]) {
-      pressSegment(segment);
-      expect(screen.getByRole("button", { name: GROW_STRINGS.reportsRow.title })).toBeOnTheScreen();
-    }
-  });
-});
-
-describe("screen 15, Reports", () => {
-  const tileLabel = (index: number, period: "week" | "month"): string => {
-    const tile = MOCK_REPORTS[period].tiles[index];
-    if (tile === undefined) throw new Error(`no mock tile at index ${index}`);
-    return `${tile.value} ${tile.label}`;
-  };
-
-  it("shows the week values and the purpose note (Req 12.1, 12.3)", () => {
-    openApp(ROUTE_PATH.reports);
-
-    expect(screen.getByRole("header", { name: "This Week with Xelulu" })).toBeOnTheScreen();
-    expect(screen.getByText(REPORTS_STRINGS.subheader)).toBeOnTheScreen();
-    for (let index = 0; index < MOCK_REPORTS.week.tiles.length; index += 1) {
-      expect(screen.getByLabelText(tileLabel(index, "week"), { exact: true })).toBeOnTheScreen();
-    }
-    expect(
-      screen.getByText(REPORTS_STRINGS.interestsHeading(MOCK_IDENTITY.child)),
-    ).toBeOnTheScreen();
-    expect(screen.getByText(MOCK_REPORTS.week.interests_label)).toBeOnTheScreen();
-    expect(screen.getByText(REPORTS_STRINGS.purposeNote)).toBeOnTheScreen();
-    expectOneSelectedSegment(REPORTS_STRINGS.segmentsLabel);
-  });
-
-  // Property 10: the segment swaps the Mock_Module behind all four tiles.
-  it("swaps all four numbers between Month and Week (Req 12.2)", () => {
-    openApp(ROUTE_PATH.reports);
-
-    pressSegment(REPORTS_STRINGS.segments.month);
-
-    for (let index = 0; index < MOCK_REPORTS.month.tiles.length; index += 1) {
-      expect(screen.getByLabelText(tileLabel(index, "month"), { exact: true })).toBeOnTheScreen();
-      expect(screen.queryByLabelText(tileLabel(index, "week"), { exact: true })).toBeNull();
-    }
-    expectOneSelectedSegment(REPORTS_STRINGS.segmentsLabel);
-
-    pressSegment(REPORTS_STRINGS.segments.week);
-
-    expect(screen.getByLabelText(tileLabel(0, "week"), { exact: true })).toBeOnTheScreen();
-  });
-});
 
 describe("screen 12, Family", () => {
   /** The mock member at `index`, so the assertions name Dad and Meera, not array slots. */

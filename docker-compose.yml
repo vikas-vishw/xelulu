@@ -21,8 +21,9 @@ services:
   # 127.0.0.1 only: the gateway's Operator_Surface and the simulator's Control_Surface. The
   # command is each image's CMD plus the argument that binds that surface on all container
   # interfaces (Local_Mode only). The gateway also takes the Transcripts_Argument, so this local
-  # stack shows transcript and reply text on the operator channel; it has effect in Local_Mode
-  # only. The CLIs are still driven with `docker compose exec`.
+  # stack shows transcript and reply text on the operator channel, and the Content_Admin_Argument,
+  # so the console's Content page may write; both have effect in Local_Mode only. The CLIs are
+  # still driven with `docker compose exec`.
   #
   # Each service's `environment:` carries its own eight G3 keys with Local_Mode defaults, so
   # `docker compose up --build` works with no root `.env` at all. Every value is written
@@ -41,7 +42,14 @@ services:
   # lets the simulator dial it over the Compose network. It is deliberately not published.
   gateway:
     build: { context: ., dockerfile: services/gateway/Dockerfile }
-    command: ["node", "dist/index.js", "--listen-all-interfaces", "--operator-transcripts"]
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "--listen-all-interfaces",
+        "--operator-transcripts",
+        "--content-admin",
+      ]
     environment:
       APP_ENV: "${APP_ENV:-local}"
       MQTT_BROKER_URL: "${MQTT_BROKER_URL:-mqtt://emqx:1883}"

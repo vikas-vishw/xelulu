@@ -15,12 +15,13 @@ import { MOCK_DEVICE } from "../src/features/device/mock-device";
 import { MOCK_FAMILY } from "../src/features/family/mock-family";
 import { MOCK_HOME } from "../src/features/home/mock-home";
 import { MOCK_NOTIFICATIONS } from "../src/features/notifications/mock-notifications";
-import { MOCK_PLAY, type PlayCategory } from "../src/features/play/mock-play";
+import { type PlayCategory } from "../src/features/play/mock-play";
 import { MOCK_PRIVACY } from "../src/features/privacy/mock-privacy";
 import { MOCK_CHILD_DRAFT } from "../src/features/setup/mock-setup";
 import { STACK_KEYS, TAB_KEYS, type ShellRouteKey } from "../src/features/shell/routes";
 import { SCREEN_HEADER_NAME } from "../src/features/shell/strings";
 import { MOCK_IDENTITY } from "../src/lib/mock-identity";
+import { APP_CONTENT_STORE } from "../src/lib/stores/content-store";
 
 /** The three filterable Play categories; the "All" segment is not a category. */
 const PLAY_CATEGORIES: readonly PlayCategory[] = ["games", "stories", "learning"];
@@ -108,11 +109,12 @@ describe("the mock world is one world", () => {
     });
 
     // Jest's `expect` takes one argument, so the category is named by the case title instead of
-    // a message: every segment of screen 8 has something to show.
+    // a message: every segment of screen 8 has something to show. The cards come from the shared
+    // Starter_Content through the content In_App_Store now, so this is a claim about the seed.
     it.each(PLAY_CATEGORIES)("the %s segment holds at least one item", (category) => {
-      expect(MOCK_PLAY.items.filter((item) => item.category === category).length).toBeGreaterThan(
-        0,
-      );
+      expect(
+        APP_CONTENT_STORE.playItems().filter((item) => item.category === category).length,
+      ).toBeGreaterThan(0);
     });
 
     it("SCREEN_HEADER_NAME has a non-empty entry for every route but Home", () => {

@@ -1,6 +1,7 @@
 // Compose_Acceptance_Check (Req 23.1–23.8, 23.11–23.13; design D13 and "Compose and CI";
 // Phase 1.3 Req 10.5 and C14 for the `stream` criterion; Phase 3B Req 22.1 and design
-// "Compose and tooling" for the `conversation` criterion).
+// "Compose and tooling" for the `conversation` criterion; Phase 4 Req 20.7 for the `content`
+// criterion).
 // Run from the repo root, after `docker compose build gateway simulator`:
 //   node tooling/compose/compose-acceptance.ts
 // Self-contained: `node:` imports only and erasable TypeScript syntax only, so Node 24 runs it
@@ -8,9 +9,9 @@
 // tooling/test/compose-acceptance.test.ts; the CLI entry runs only when this file is the script.
 //
 // It writes a temporary Local_Mode `.env` (refusing to start if one exists), brings the stack up,
-// runs steps 23.1, stream, conversation, 23.2–23.8 in order against the gateway log, both CLIs
-// and (for `stream` and `conversation`) the two host-loopback published ports, polling every
-// 500 ms inside a 600 s budget, and prints `PASSED 23.1–23.8 + stream + conversation` or
+// runs steps 23.1, stream, conversation, content, 23.2–23.8 in order against the gateway log,
+// both CLIs and (for `stream`, `conversation` and `content`) the two host-loopback published
+// ports, polling every 500 ms inside a 600 s budget, and prints the PASSED line or
 // `FAILED <criterion>` (or `FAILED budget`) followed by the token-redacted logs. It always stops
 // the stack and deletes the `.env` it wrote, also on SIGINT and SIGTERM. It prints no env value
 // except DEVICE_ID, and never prints stream text or a Conversation_Turn_View field.
@@ -31,13 +32,15 @@ import { fileURLToPath } from "node:url";
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Every criterion, in run order: `stream` (Phase 1.3 C14) runs right after 23.1, and
- * `conversation` (Phase 3B) right after it, while the gateway log is still short.
+ * Every criterion, in run order: `stream` (Phase 1.3 C14) runs right after 23.1, `conversation`
+ * (Phase 3B) right after it and `content` (Phase 4 Req 20.7) right after that, while the gateway
+ * log is still short.
  */
 export const CRITERIA = [
   "23.1",
   "stream",
   "conversation",
+  "content",
   "23.2",
   "23.3",
   "23.4",
@@ -72,7 +75,7 @@ export const TURN_FRAMES = 50;
 export const REPLAYED_EVENTS = 5;
 
 export const DEVICE_ID_VALUE = "xlu_ci_sim";
-export const PASSED_LINE = "PASSED 23.1–23.8 + stream + conversation";
+export const PASSED_LINE = "PASSED 23.1–23.8 + stream + conversation + content";
 export const REDACTED = "[redacted]";
 
 /** The host address both local surfaces are published on (Phase 1.3 C8). */
@@ -105,6 +108,19 @@ export const ACTIVE_CHILD_LIMIT_MS = 35_000;
 export const CONVERSATION_LIMIT_MS = 15_000;
 /** Conversation_Turn_View states a turn does not move on from. */
 export const TERMINAL_TURN_STATES = Object.freeze(["done", "interrupted", "failed"] as const);
+
+/** The two Operator_Content_Routes the `content` criterion uses (Phase 4 Req 16.1, 16.7). */
+export const CONTENT_LIST_PATH = "/v1/content";
+export const ROUTINE_RUN_PATH = "/v1/routines/run";
+/**
+ * The routine the criterion fires. `morning` is the behaviour that carries a `gesture`, so what
+ * the Device_Policy_Gate decides about it is visible either way: it is sent by day and refused
+ * `quiet_hours` by night under `child_mock_1`'s 22:00–07:00, which is exactly why the criterion
+ * accepts two shapes and is time-independent (Req 20.7).
+ */
+export const CONTENT_ROUTINE_ID = "morning";
+/** How long the criterion waits for the routine's and the story turn's log entries. */
+export const CONTENT_LIMIT_MS = 15_000;
 
 /** Contract-valid command data for step 23.3 and 23.4. */
 const SAY_DATA = Object.freeze({
@@ -886,6 +902,115 @@ export function checkConversation(
   return missing.length === 0 ? PASS : pending("waiting for " + missing.join(", "));
 }
 
+/**
+ * Phase 4 (Req 20.7): what `GET /v1/content` must answer for the Content page to be usable —
+ * `write_enabled` true, because the Compose gateway carries the Content_Admin_Argument, and at
+ * least one `active` seeded item. It returns the active ids, so the story step below can be
+ * required to name one of them rather than any string.
+ */
+export function readActiveContentIds(body: string): readonly string[] | null {
+  const parsed = parseJsonObject(body);
+  if (parsed === null || parsed["ok"] !== true || parsed["write_enabled"] !== true) return null;
+  const items = parsed["items"];
+  if (!Array.isArray(items)) return null;
+  const ids: string[] = [];
+  for (const item of items) {
+    if (!isPlainObject(item) || item["status"] !== "active") continue;
+    const id = item["content_id"];
+    if (typeof id === "string" && id.length > 0) ids.push(id);
+  }
+  return ids;
+}
+
+/** What `POST /v1/routines/run` answered: the gate's counts and any Policy_Refusal. */
+export type RoutineRunBody = Readonly<{ actions: number; sent: number; refusal: string | null }>;
+
+export function readRoutineRun(body: string): RoutineRunBody | null {
+  const parsed = parseJsonObject(body);
+  if (parsed === null || parsed["ok"] !== true) return null;
+  const actions = parsed["actions"];
+  const sent = parsed["sent"];
+  const refusal = parsed["refusal"];
+  if (typeof actions !== "number" || typeof sent !== "number") return null;
+  if (refusal !== null && typeof refusal !== "string") return null;
+  return { actions, sent, refusal };
+}
+
+/**
+ * Exactly two shapes are a pass, and anything else fails (Req 20.7). Either the gate allowed the
+ * behaviour and every action was published, or it refused it `quiet_hours` and nothing was. A
+ * criterion demanding the first would fail every night; one accepting any answer would pass
+ * against a gate that refused everything for the wrong reason.
+ */
+export function checkRoutineRunShape(run: RoutineRunBody): Verdict {
+  if (run.refusal === null) {
+    if (run.actions > 0 && run.sent === run.actions) return PASS;
+    return fail(
+      "the routine run sent " + String(run.sent) + " of " + String(run.actions) + " actions",
+    );
+  }
+  if (run.refusal === "quiet_hours" && run.sent === 0) return PASS;
+  return fail("the routine run was refused " + run.refusal + ", sent " + String(run.sent));
+}
+
+/**
+ * The log half of the same two shapes: one `routine_fired` entry for the manual run with the
+ * counts the route answered, and then either an ack `done` for a published command or, on the
+ * quiet-hours shape, no `message_out` at all in the window.
+ *
+ * It reads the Gateway_Log rather than the operator stream. The stream carries these same entries
+ * and the `stream` criterion already proves that channel; reading the log keeps this criterion to
+ * one bounded read and off a 65 KiB SSE backlog.
+ */
+export function checkRoutineFired(
+  window: readonly LogEntry[],
+  deviceId: string,
+  run: RoutineRunBody,
+): Verdict {
+  const fired = window.filter(
+    (e) =>
+      e["kind"] === "routine_fired" &&
+      e["device_id"] === deviceId &&
+      e["ref_id"] === CONTENT_ROUTINE_ID &&
+      e["trigger"] === "manual",
+  );
+  const entry = fired.find((e) => e["sent"] === run.sent && e["actions"] === run.actions);
+  if (entry === undefined) return pending("waiting for the routine_fired entry");
+
+  const sent = window.filter((e) => e["kind"] === "message_out" && e["device_id"] === deviceId);
+  if (run.refusal !== null) {
+    return sent.length === 0 ? PASS : fail("a command was published during a refused routine");
+  }
+  if (entry["refusal"] !== null) return fail("the routine_fired entry names a refusal");
+  const cmdIds = sent.flatMap((e) => (typeof e["cmd_id"] === "string" ? [e["cmd_id"]] : []));
+  for (const cmdId of cmdIds) {
+    if (ackResults(window, cmdId).some((r) => r["outcome"] === "done")) return PASS;
+  }
+  return pending("waiting for an ack_result done for a routine command");
+}
+
+/**
+ * Phase 4 (Req 20.7): the story turn reached the curated library. One `story_step` entry for the
+ * turn whose `content_id` is one of the ids `GET /v1/content` reported `active`, so the entry
+ * cannot pass by naming any string.
+ */
+export function checkStoryStep(
+  window: readonly LogEntry[],
+  deviceId: string,
+  turnId: string,
+  activeIds: readonly string[],
+): Verdict {
+  const steps = window.filter(
+    (e) => e["kind"] === "story_step" && e["device_id"] === deviceId && e["turn_id"] === turnId,
+  );
+  if (steps.length === 0) return pending("waiting for the story_step entry");
+  const named = steps.find(
+    (e) => typeof e["content_id"] === "string" && activeIds.includes(e["content_id"]),
+  );
+  if (named === undefined) return fail("no story_step entry names a seeded content item");
+  return PASS;
+}
+
 // ---------------------------------------------------------------------------------------------
 // The Compose run (impure)
 // ---------------------------------------------------------------------------------------------
@@ -1310,6 +1435,64 @@ function acceptanceSteps(h: Harness): readonly Step[] {
         }
         await h.waitFor(c, CONVERSATION_LIMIT_MS, () =>
           checkConversation(windowFrom(h.logs(c), from), stream.body, deviceId, turnId),
+        );
+      },
+    },
+    {
+      // Phase 4 (Req 20.7): the curated library is readable and writable over the
+      // Operator_Content_Routes, a routine fires through the UNCHANGED Device_Policy_Gate, and a
+      // story turn speaks from the library. It runs with the active child the `conversation`
+      // criterion already set and sends no second `config`: that child opens the `stories`
+      // category, so the story turn resolves, and has quiet hours 22:00-07:00, which is why the
+      // routine assertion accepts the gate's refusal as readily as its consent.
+      criterion: "content",
+      async run() {
+        const c: Criterion = "content";
+        const list = await h.get(c, OPERATOR_PORT, CONTENT_LIST_PATH, () => false);
+        if (list.status !== 200) {
+          throw new CheckFailure(c, "the content list answered " + String(list.status));
+        }
+        const activeIds = readActiveContentIds(list.body);
+        if (activeIds === null) {
+          throw new CheckFailure(c, "the content list gave no ok, write-enabled response");
+        }
+        if (activeIds.length === 0) throw new CheckFailure(c, "no active content item is seeded");
+
+        const beforeRun = h.logs(c).length;
+        const ran = await h.post(
+          c,
+          OPERATOR_PORT,
+          ROUTINE_RUN_PATH,
+          JSON.stringify({ device_id: deviceId, routine: CONTENT_ROUTINE_ID }),
+        );
+        if (ran.status !== 200) {
+          throw new CheckFailure(c, "the routine run answered " + String(ran.status));
+        }
+        const run = readRoutineRun(ran.body);
+        if (run === null) throw new CheckFailure(c, "the routine run gave no counted response");
+        const shape = checkRoutineRunShape(run);
+        if (shape.status !== "pass") throw new CheckFailure(c, shape.why);
+        await h.waitFor(c, CONTENT_LIMIT_MS, () =>
+          checkRoutineFired(windowFrom(h.logs(c), beforeRun), deviceId, run),
+        );
+
+        const beforeTurn = h.logs(c).length;
+        const posted = await h.post(
+          c,
+          PANEL_PORT,
+          AUDIO_TURN_PATH,
+          JSON.stringify({ utterance: CONVERSATION_UTTERANCE }),
+        );
+        if (posted.status !== 200) {
+          throw new CheckFailure(c, "the story turn answered " + String(posted.status));
+        }
+        const body = parseJsonObject(posted.body);
+        if (body === null || body["ok"] !== true) {
+          throw new CheckFailure(c, "the story turn gave no ok response");
+        }
+        const storyTurnId = stringField(body, "turn_id", c);
+        await h.waitFor(c, CONTENT_LIMIT_MS, () =>
+          checkStoryStep(windowFrom(h.logs(c), beforeTurn), deviceId, storyTurnId, activeIds),
         );
       },
     },

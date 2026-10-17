@@ -24,6 +24,11 @@ import {
   checkAudioTurn,
   checkCommandDone,
   checkConversation,
+  checkRoutineFired,
+  checkRoutineRunShape,
+  checkStoryStep,
+  readActiveContentIds,
+  readRoutineRun,
   checkEventLogged,
   checkEventStepClean,
   checkFirstDevicesEvent,
@@ -544,6 +549,125 @@ describe("step predicates", () => {
       expect(sseEvents("")).toEqual([]);
     });
   });
+
+  describe("content (Phase 4 Req 20.7)", () => {
+    const TURN = "turn_s1";
+    const SEEDED = "story_panchatantra_drum";
+
+    const listBody = (over: Record<string, unknown> = {}): string =>
+      JSON.stringify({
+        ok: true,
+        write_enabled: true,
+        items: [
+          { content_id: SEEDED, status: "active" },
+          { content_id: "content_draft_1", status: "draft" },
+        ],
+        ...over,
+      });
+
+    it("reads the active ids only, from an ok write-enabled list", () => {
+      expect(readActiveContentIds(listBody())).toEqual([SEEDED]);
+    });
+
+    it.each([
+      ["write_enabled false", listBody({ write_enabled: false })],
+      ["ok false", listBody({ ok: false })],
+      ["no items array", listBody({ items: "none" })],
+      ["a non-JSON body", "<html></html>"],
+    ])("reads nothing from %s", (_name, body) => {
+      expect(readActiveContentIds(body)).toBeNull();
+    });
+
+    const runBody = (over: Record<string, unknown>): string =>
+      JSON.stringify({ ok: true, actions: 3, sent: 3, refused: 0, refusal: null, ...over });
+
+    it("accepts the two shapes the gate can answer with, and nothing else", () => {
+      const allowed = readRoutineRun(runBody({}));
+      const refused = readRoutineRun(runBody({ sent: 0, refused: 1, refusal: "quiet_hours" }));
+      expect(allowed).toEqual({ actions: 3, sent: 3, refusal: null });
+      expect(refused).toEqual({ actions: 3, sent: 0, refusal: "quiet_hours" });
+      expect(checkRoutineRunShape({ actions: 3, sent: 3, refusal: null }).status).toBe("pass");
+      expect(checkRoutineRunShape({ actions: 3, sent: 0, refusal: "quiet_hours" }).status).toBe(
+        "pass",
+      );
+      // A partial send, a refusal with a published command, and any other refusal all fail.
+      for (const run of [
+        { actions: 3, sent: 1, refusal: null },
+        { actions: 0, sent: 0, refusal: null },
+        { actions: 3, sent: 1, refusal: "quiet_hours" },
+        { actions: 3, sent: 0, refusal: "movement_off" },
+      ]) {
+        expect(checkRoutineRunShape(run).status, JSON.stringify(run)).toBe("fail");
+      }
+      expect(readRoutineRun("{}")).toBeNull();
+      expect(readRoutineRun(runBody({ actions: "three" }))).toBeNull();
+    });
+
+    const fired = (over: Record<string, unknown> = {}): LogEntry =>
+      at(0, {
+        kind: "routine_fired",
+        device_id: DEV,
+        trigger: "manual",
+        ref_id: "morning",
+        threshold: null,
+        battery_pct: null,
+        actions: 3,
+        sent: 3,
+        refused: 0,
+        refusal: null,
+        ...over,
+      });
+
+    const allowedRun = { actions: 3, sent: 3, refusal: null } as const;
+    const refusedRun = { actions: 3, sent: 0, refusal: "quiet_hours" } as const;
+
+    it("passes the allowed shape on the entry plus an ack done", () => {
+      const window = [fired(), msgOut("cmd1", "say"), ackResult("cmd1", "done")];
+      expect(checkRoutineFired(window, DEV, allowedRun).status).toBe("pass");
+    });
+
+    it("stays pending without the entry or without the ack", () => {
+      expect(checkRoutineFired([], DEV, allowedRun).status).toBe("pending");
+      expect(checkRoutineFired([fired(), msgOut("cmd1", "say")], DEV, allowedRun).status).toBe(
+        "pending",
+      );
+      // A scheduled firing is not the manual run this criterion asked for.
+      expect(checkRoutineFired([fired({ trigger: "schedule" })], DEV, allowedRun).status).toBe(
+        "pending",
+      );
+    });
+
+    it("passes the quiet-hours shape only when nothing was published", () => {
+      const quiet = fired({ sent: 0, refused: 1, refusal: "quiet_hours" });
+      expect(checkRoutineFired([quiet], DEV, refusedRun).status).toBe("pass");
+      expect(checkRoutineFired([quiet, msgOut("cmd1", "say")], DEV, refusedRun).status).toBe(
+        "fail",
+      );
+    });
+
+    const storyStep = (over: Record<string, unknown> = {}): LogEntry =>
+      at(0, {
+        kind: "story_step",
+        device_id: DEV,
+        turn_id: TURN,
+        content_id: SEEDED,
+        step_id: "s1",
+        choice_id: null,
+        outcome: "started",
+        ...over,
+      });
+
+    it("requires a story_step naming one of the seeded ids", () => {
+      expect(checkStoryStep([storyStep()], DEV, TURN, [SEEDED]).status).toBe("pass");
+      expect(checkStoryStep([], DEV, TURN, [SEEDED]).status).toBe("pending");
+      expect(
+        checkStoryStep([storyStep({ turn_id: "turn_other" })], DEV, TURN, [SEEDED]).status,
+      ).toBe("pending");
+      expect(checkStoryStep([storyStep({ content_id: "nope" })], DEV, TURN, [SEEDED]).status).toBe(
+        "fail",
+      );
+    });
+  });
 });
 
 describe("loopbackGet (the bounded stream read)", () => {
@@ -700,11 +824,12 @@ describe("first-failure naming", () => {
     }));
   }
 
-  it("runs stream then conversation after 23.1, keeping every Phase 1.2 criterion in order", () => {
+  it("runs stream, conversation then content after 23.1, keeping the Phase 1.2 order", () => {
     expect(CRITERIA).toEqual([
       "23.1",
       "stream",
       "conversation",
+      "content",
       "23.2",
       "23.3",
       "23.4",
@@ -713,9 +838,10 @@ describe("first-failure naming", () => {
       "23.7",
       "23.8",
     ]);
-    expect(PASSED_LINE).toBe("PASSED 23.1–23.8 + stream + conversation");
+    expect(PASSED_LINE).toBe("PASSED 23.1–23.8 + stream + conversation + content");
     expect(resultLine({ ok: false, label: "stream", why: "x" })).toBe("FAILED stream");
     expect(resultLine({ ok: false, label: "conversation", why: "x" })).toBe("FAILED conversation");
+    expect(resultLine({ ok: false, label: "content", why: "x" })).toBe("FAILED content");
   });
 
   it("passes when every step passes", async () => {

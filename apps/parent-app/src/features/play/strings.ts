@@ -17,15 +17,13 @@ export const PLAY_STRINGS = {
   startsFromRobot: "Xelulu starts this on the robot. Starting it from the app comes later.",
   /** The one muted line when a segment holds no card (Req 10.4). */
   nothingHere: "Nothing here yet.",
-  /** The eight mock cards, in the Reference's order with its four first (Req 10.2). */
-  items: {
-    animalAdventure: { title: "Animal Adventure", subtitle: "Go on a quest" },
-    treasureHunt: { title: "Treasure Hunt", subtitle: "Find, explore, learn" },
-    dance: { title: "Dance with Xelulu", subtitle: "Move and groove" },
-    storyTime: { title: "Story Time", subtitle: "Bedtime tales together" },
-    rhymeTime: { title: "Rhyme Time", subtitle: "Songs and rhymes" },
-    countingFun: { title: "Counting Fun", subtitle: "Numbers and shapes" },
-    ourWorld: { title: "Our World", subtitle: "Places and people" },
-    feelings: { title: "Feelings & Breathing", subtitle: "Calm together" },
+  /**
+   * One subtitle per segment (Phase 4 Req 19.3). A Content_Item carries a title and no subtitle,
+   * and the app invents no per-item text, so every card in a segment carries that segment's line.
+   */
+  cardSubtitles: {
+    games: "Play and move together",
+    stories: "Listen together",
+    learning: "Learn together",
   },
 } as const;
