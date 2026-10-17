@@ -30,6 +30,7 @@ import { createConversationView } from "./state/conversation-view.js";
 import type { Alerts } from "./state/alerts.js";
 import type { ChildContextTable } from "./state/child-context.js";
 import type { TranscriptStore } from "./state/transcript-store.js";
+import type { StorySessions } from "./story/story-session.js";
 import type { ToolRouter } from "./tools/tool-router.js";
 import { decideTurn, type TurnDecision } from "./turn-pipeline.js";
 import { SAFE_REDIRECT } from "./safety/safe-text.js";
@@ -58,6 +59,8 @@ export type VoiceBrainDeps = Readonly<{
   llm: LlmProvider;
   tts: TtsProvider;
   tools: ToolRouter;
+  /** The curated-story state the pipeline reads; this module only logs what it decided. */
+  stories: StorySessions;
   context: ChildContextTable;
   transcripts: TranscriptStore;
   alerts: Alerts;
@@ -293,7 +296,7 @@ export function createVoiceBrain(deps: VoiceBrainDeps): VoiceBrain {
       // the clock rather than waiting.
       void (async () => {
         const outcome = await decideTurn(
-          { llm: deps.llm, tools: deps.tools },
+          { llm: deps.llm, tools: deps.tools, stories: deps.stories, clock: deps.clock },
           {
             deviceId: target.deviceId,
             turnId: target.turnId,
@@ -316,6 +319,9 @@ export function createVoiceBrain(deps: VoiceBrainDeps): VoiceBrain {
             output: null,
             tools: [],
             transcript: "",
+            curated: false,
+            story: null,
+            word_id: null,
           };
           deps.log.add(
             brainEntryFields(
@@ -363,6 +369,21 @@ export function createVoiceBrain(deps: VoiceBrainDeps): VoiceBrain {
             decision: decided.output.decision,
             rule: decided.output.rule,
             topic: null,
+          });
+        }
+        // One `story_step` entry per curated step this turn started, spoke, ended, left
+        // unresolved or had refused — ids and a closed enum, and no step text, no choice prompt
+        // and no part of the child's answer (Req 3.5, 3.7, safety.md §7). It sits after the
+        // `safety_decision` entries so a refused step reads in the order it happened.
+        if (decided.story !== null) {
+          deps.log.add({
+            kind: "story_step",
+            device_id: target.deviceId,
+            turn_id: target.turnId,
+            content_id: decided.story.content_id,
+            step_id: decided.story.step_id,
+            choice_id: decided.story.choice_id,
+            outcome: decided.story.outcome,
           });
         }
         deps.log.add(

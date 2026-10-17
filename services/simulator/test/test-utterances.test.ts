@@ -22,27 +22,42 @@ import {
  */
 const CONTRACT_FRAME_MAX_BYTES = 1_500;
 
-/** The eight cases Requirement 19.5 names, each with the utterance that must cover it. */
+/**
+ * The cases Requirement 19.5 names, each with the utterance that must cover it, plus the five
+ * Phase 4 Req 22.1 additions. The list is a FLOOR and not a count: the table may grow, so
+ * nothing here pins its length (Phase 4 Req 22.3).
+ *
+ * `scary-request` is listed as what it actually is rather than as its name suggests: the
+ * Gateway's Input_Guard has no frightening-content rule, so the refusal demonstration is
+ * `closed-category-request` (Phase 4 Req 22.1b, 22.1c). The Gateway pins the decision each one
+ * draws; this file only asserts the text exists.
+ */
 const REQUIRED_CASES: readonly Readonly<{ case: string; name: string }>[] = [
   { case: "a plain English question", name: "hello" },
   { case: "a story request that needs a tool", name: "story" },
   { case: "a Defer_Topic question", name: "where-did-grandpa-go" },
-  { case: "an unsafe request", name: "scary-request" },
+  { case: "an unsafe-sounding request", name: "scary-request" },
+  { case: "a request in a category the parent has not opened", name: "closed-category-request" },
   { case: "a distress disclosure", name: "sad" },
   { case: "a Hindi utterance", name: "hindi-hello" },
   { case: "a code-mixed utterance", name: "mixed-hindi-english" },
   { case: "one that triggers the Filler path", name: "slow-thinker" },
+  { case: "a branch answer in English", name: "story-answer-en" },
+  { case: "a branch answer in Hindi", name: "story-answer-hi" },
+  { case: "an answer that matches no branch", name: "story-answer-unmatched" },
+  { case: "a stop word that ends a story", name: "story-stop" },
 ];
 
 describe("the Test_Utterance table (Req 19.5)", () => {
-  it("covers all eight required cases, each with its own name", () => {
-    expect(TEST_UTTERANCES).toHaveLength(REQUIRED_CASES.length);
+  it("covers every required case, each with its own name", () => {
     expect(new Set(TEST_UTTERANCE_NAMES).size).toBe(TEST_UTTERANCES.length);
     expect(TEST_UTTERANCE_NAMES).toEqual(TEST_UTTERANCES.map((u) => u.name));
     for (const required of REQUIRED_CASES) {
       expect(findTestUtterance(required.name), required.case).not.toBeNull();
     }
-    expect([...TEST_UTTERANCE_NAMES].sort()).toEqual(REQUIRED_CASES.map((c) => c.name).sort());
+    for (const name of REQUIRED_CASES.map((c) => c.name)) {
+      expect(TEST_UTTERANCE_NAMES).toContain(name);
+    }
   });
 
   it("carries a non-empty text in a supported language, in both languages overall", () => {

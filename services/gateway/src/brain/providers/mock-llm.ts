@@ -79,12 +79,31 @@ export const MOCK_LLM_RULES: readonly MockLlmRule[] = Object.freeze([
   // A request that needs `content_lookup`. The category is the Content_Library's own code
   // (`stories`, plural), which is also the Child_Context category a parent opens: a request for
   // anything else answers `unknown_category`, which the Tool_Router reports as `error`.
+  //
+  // `start: true` asks for a story to be TOLD rather than for titles to be listed (Phase 4 Req
+  // 3.2), so this rule's spoken reply is no longer the text below: the Tool_Router opens a
+  // Story_Session and the turn speaks the seeded item's curated first step instead, and the
+  // reply here is only what a provider would have said on its own (Req 22.1a).
   Object.freeze({
     match: Object.freeze(["story"]),
     lang: "en-IN",
     reply: "Here is a little story for you.",
     toolRequests: Object.freeze([
-      Object.freeze({ name: "content_lookup", args: Object.freeze({ category: "stories" }) }),
+      Object.freeze({
+        name: "content_lookup",
+        args: Object.freeze({ category: "stories", start: true }),
+      }),
+    ]),
+    delayMs: 200,
+  }),
+  // A request for the day's word. It carries NO category: `word_of_the_day` is gated on `world`
+  // by the Content_Library itself, on this path exactly as on the morning routine's (Req 5.3a).
+  Object.freeze({
+    match: Object.freeze(["word", "today"]),
+    lang: "en-IN",
+    reply: "Let us learn a new word.",
+    toolRequests: Object.freeze([
+      Object.freeze({ name: "content_lookup", args: Object.freeze({ word_of_the_day: true }) }),
     ]),
     delayMs: 200,
   }),
@@ -96,13 +115,18 @@ export const MOCK_LLM_RULES: readonly MockLlmRule[] = Object.freeze([
     toolRequests: Object.freeze([]),
     delayMs: 1_200,
   }),
-  // A Hindi utterance.
+  // A Hindi utterance. It carries `start: true` for the same reason the English one does, and
+  // it has to: without it there would be no way to put a device into a Hindi Story_Session from
+  // the panel, and the Hindi branch-answer utterance would resolve against nothing (Req 22.1a).
   Object.freeze({
     match: Object.freeze(["कहानी"]),
     lang: "hi-IN",
     reply: "सुनो, एक छोटी कहानी।",
     toolRequests: Object.freeze([
-      Object.freeze({ name: "content_lookup", args: Object.freeze({ category: "stories" }) }),
+      Object.freeze({
+        name: "content_lookup",
+        args: Object.freeze({ category: "stories", start: true }),
+      }),
     ]),
     delayMs: 200,
   }),

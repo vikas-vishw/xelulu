@@ -215,22 +215,29 @@ describe("the Mock_Llm rule table (Req 2.5)", () => {
       lang: "en-IN",
       ruleAt: 4,
     },
+    // Phase 4: the ninth rule, which asks for the day's word and carries no category (Req 5.3).
+    {
+      name: "a request for the day's word",
+      transcript: "what is the word for today",
+      lang: "en-IN",
+      ruleAt: 5,
+    },
     {
       name: "a reply slower than the Filler_Deadline",
       transcript: "let me think hard",
       lang: "en-IN",
-      ruleAt: 5,
+      ruleAt: 6,
     },
-    { name: "a Hindi utterance", transcript: "मुझे कहानी सुनाओ", lang: "hi-IN", ruleAt: 6 },
+    { name: "a Hindi utterance", transcript: "मुझे कहानी सुनाओ", lang: "hi-IN", ruleAt: 7 },
     {
       name: "a code-mixed utterance",
       transcript: "mujhe ek story sunao",
       lang: "hi-IN",
-      ruleAt: 7,
+      ruleAt: 8,
     },
   ];
 
-  it("covers all eight required cases, each with its own rule", () => {
+  it("covers every required case, each with its own rule", () => {
     expect(new Set(cases.map((c) => c.ruleAt)).size).toBe(cases.length);
     expect(MOCK_LLM_RULES).toHaveLength(cases.length);
   });
@@ -352,7 +359,7 @@ describe("the Mock_Llm rule table (Req 2.5)", () => {
     deadlines.fireDue(T0 + 1_200);
     await expect(pending).resolves.toEqual({
       ok: true,
-      text: MOCK_LLM_RULES[5]?.reply,
+      text: MOCK_LLM_RULES[6]?.reply,
       toolRequests: [],
     });
   });

@@ -70,16 +70,29 @@ export type PendingSpeech = Readonly<{
 /** At most one pending per turn, and at most this many turns held: oldest dropped (defensive). */
 export const PENDING_SPEECH_MAX_TURNS = 64;
 
+/**
+ * What one allowed transcript did to the session. Every variant carries the `contentId` as well
+ * as the `stepId`, because the Turn_Pipeline's `TurnDecision.story` — and so the `story_step`
+ * Log_Entry the Voice_Brain writes from it — names both, and the session is the only thing that
+ * knows which item the device was inside (Req 3.5).
+ */
 export type StoryAdvance =
   | {
       readonly kind: "step";
+      readonly contentId: string;
       readonly stepId: string;
       readonly choiceId: string | null;
       readonly speak: string;
     }
-  | { readonly kind: "repeat"; readonly stepId: string; readonly speak: string }
+  | {
+      readonly kind: "repeat";
+      readonly contentId: string;
+      readonly stepId: string;
+      readonly speak: string;
+    }
   | {
       readonly kind: "ended";
+      readonly contentId: string;
       readonly stepId: string;
       readonly speak: string;
       readonly outcome: StoryStepOutcome;
@@ -193,6 +206,7 @@ export function createStorySessions(
         sessions.delete(deviceId);
         return {
           kind: "ended",
+          contentId: session.contentId,
           stepId: current.step_id,
           speak: STORY_CLOSING_LINE[lang],
           outcome: "ended",
@@ -207,6 +221,7 @@ export function createStorySessions(
           sessions.delete(deviceId);
           return {
             kind: "ended",
+            contentId: session.contentId,
             stepId: current.step_id,
             speak: STORY_CLOSING_LINE[lang],
             outcome: "ended",
@@ -217,6 +232,7 @@ export function createStorySessions(
           sessions.delete(deviceId);
           return {
             kind: "ended",
+            contentId: session.contentId,
             stepId: current.step_id,
             speak: STORY_CLOSING_LINE[lang],
             outcome: "ended",
@@ -224,7 +240,13 @@ export function createStorySessions(
         }
         session.stepId = next.step_id;
         session.unresolved = 0;
-        return { kind: "step", stepId: next.step_id, choiceId: null, speak };
+        return {
+          kind: "step",
+          contentId: session.contentId,
+          stepId: next.step_id,
+          choiceId: null,
+          speak,
+        };
       }
 
       // (3) A branching step: the choices in declaration order, first match wins. Only the
@@ -238,6 +260,7 @@ export function createStorySessions(
           sessions.delete(deviceId);
           return {
             kind: "ended",
+            contentId: session.contentId,
             stepId: current.step_id,
             speak: STORY_CLOSING_LINE[lang],
             outcome: "ended",
@@ -245,7 +268,13 @@ export function createStorySessions(
         }
         session.stepId = next.step_id;
         session.unresolved = 0;
-        return { kind: "step", stepId: next.step_id, choiceId: choice.choice_id, speak };
+        return {
+          kind: "step",
+          contentId: session.contentId,
+          stepId: next.step_id,
+          choiceId: choice.choice_id,
+          speak,
+        };
       }
 
       // (4) Nothing matched: repeat once, then close (Req 4.4).
@@ -254,12 +283,18 @@ export function createStorySessions(
         sessions.delete(deviceId);
         return {
           kind: "ended",
+          contentId: session.contentId,
           stepId: current.step_id,
           speak: STORY_CLOSING_LINE[lang],
           outcome: "unresolved",
         };
       }
-      return { kind: "repeat", stepId: current.step_id, speak: stepSpeech(current, lang) };
+      return {
+        kind: "repeat",
+        contentId: session.contentId,
+        stepId: current.step_id,
+        speak: stepSpeech(current, lang),
+      };
     },
 
     putPending(turnId, speech) {

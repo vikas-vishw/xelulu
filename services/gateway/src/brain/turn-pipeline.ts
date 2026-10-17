@@ -20,12 +20,15 @@ import {
   type AgeStage,
   type AllowListedTool,
   type BrainTurnCause,
+  type StoryStepOutcome,
   type SupportedLang,
   type ToolOutcome,
 } from "@xelulu/shared";
 
+import type { Clock } from "../clock.js";
 import type { LlmProvider, ToolRequest } from "./providers/llm-provider.js";
 import type { SttSession } from "./providers/stt-provider.js";
+import type { StorySessions } from "./story/story-session.js";
 import { ALLOW_LISTED_TOOLS_FOR_PROMPT } from "./tools/tool-catalogue.js";
 import type { ToolRouter } from "./tools/tool-router.js";
 import { checkInput, type GuardContext, type SafetyVerdict } from "./safety/input-guard.js";
@@ -45,6 +48,22 @@ export const MAX_TOOL_ATTEMPTS_PER_TURN = 6;
 
 export type ToolCallSummary = Readonly<{ tool: AllowListedTool | null; outcome: ToolOutcome }>;
 
+/**
+ * Which curated step this turn spoke, and what became of it (Req 3.2, 3.4, 3.5, 3.7). Ids and a
+ * closed enum only: the step's text, the choice prompts and the child's answer are not here and
+ * reach no Log_Entry (safety.md §7).
+ *
+ * `outcome` is carried rather than re-derived because it cannot be: `started`, `spoken`, `ended`
+ * and `unresolved` are distinguishable only to the Story_Session that produced them, and
+ * `refused` only to the Output_Guard step below.
+ */
+export type TurnStoryRef = Readonly<{
+  content_id: string;
+  step_id: string;
+  choice_id: string | null;
+  outcome: StoryStepOutcome;
+}>;
+
 /** What the pipeline decided. `speak` is already guard-approved text. */
 export type TurnDecision = Readonly<{
   speak: string;
@@ -56,6 +75,12 @@ export type TurnDecision = Readonly<{
   tools: readonly ToolCallSummary[];
   /** The child's words, for the Transcript_Store only. Never logged (Omar ruling 1). */
   transcript: string;
+  /** True when the spoken text is curated prose and the model's wording was discarded (C8). */
+  curated: boolean;
+  /** The curated step this turn spoke, or null. */
+  story: TurnStoryRef | null;
+  /** The Word_Of_The_Day entry this turn spoke, or null (Req 5.7). */
+  word_id: string | null;
 }>;
 
 export type TurnFailure = Readonly<{ failed: BrainTurnCause }>;
@@ -63,6 +88,10 @@ export type TurnFailure = Readonly<{ failed: BrainTurnCause }>;
 export type PipelineDeps = Readonly<{
   llm: LlmProvider;
   tools: ToolRouter;
+  /** Where the device is inside a curated item, and what curated text this turn has waiting. */
+  stories: StorySessions;
+  /** Read once per turn, for the idle sweep. */
+  clock: Clock;
 }>;
 
 export type PipelineTurn = Readonly<{
@@ -110,6 +139,11 @@ export async function decideTurn(
   deps: PipelineDeps,
   turn: PipelineTurn,
 ): Promise<TurnDecision | TurnFailure> {
+  // 0. A session nobody came back to is ended before this turn decides anything (Req 3.8). It
+  // runs here rather than on a timer because a forgotten session costs nothing until a turn
+  // arrives, and a turn is the only moment the answer can matter.
+  deps.stories.sweep(deps.clock.now());
+
   // 1. Speech to text.
   let transcript = "";
   let detected = "";
@@ -126,7 +160,9 @@ export async function decideTurn(
   const stage = turn.context.ageStage;
   const ctx = guardContext(turn.context, lang);
 
-  // 2. The Input_Guard, before any model sees the child's words.
+  // 2. The Input_Guard, before any model sees the child's words. A story in progress changes
+  // nothing about this: the guard runs first, and its decision leaves the session's step exactly
+  // where it was, with no unresolved answer counted (Req 4.5).
   const input = checkInput(transcript, ctx);
   if (input.decision !== "allow") {
     return {
@@ -137,16 +173,42 @@ export async function decideTurn(
       output: null,
       tools: [],
       transcript,
+      curated: false,
+      story: null,
+      word_id: null,
     };
   }
 
-  // 3. The model, with the allow-listed catalogue and a bounded tool loop.
   const tools: ToolCallSummary[] = [];
+  /** The text to speak once it is known: curated prose, or the model's reply. */
+  let spokenText: string | null = null;
+  let storyRef: TurnStoryRef | null = null;
+  let wordRef: string | null = null;
+  let curated = false;
+
+  // 2a. A story in progress answers the turn itself: no LLM call and no tool call (Req 4.2).
+  if (deps.stories.inProgress(turn.deviceId)) {
+    const advance = deps.stories.advance(turn.deviceId, transcript, lang);
+    if (advance !== null) {
+      // Curated text, which still falls through to the Output_Guard at step 4.
+      spokenText = advance.speak;
+      curated = true;
+      storyRef = {
+        content_id: advance.contentId,
+        step_id: advance.stepId,
+        choice_id: advance.kind === "step" ? advance.choiceId : null,
+        // A repeated step is a spoken step; only the session can tell `ended` from `unresolved`.
+        outcome: advance.kind === "ended" ? advance.outcome : "spoken",
+      };
+    }
+  }
+
+  // 3. The model, with the allow-listed catalogue and a bounded tool loop.
   const toolResults: { name: string; text: string }[] = [];
   let attempts = 0;
   let replyText = "";
 
-  for (let round = 0; round < MAX_LLM_ROUNDS; round += 1) {
+  for (let round = 0; spokenText === null && round < MAX_LLM_ROUNDS; round += 1) {
     let reply;
     try {
       reply = await deps.llm.reply({
@@ -191,9 +253,62 @@ export async function decideTurn(
     if (!ranOne && attempts >= MAX_TOOL_ATTEMPTS_PER_TURN) break;
   }
 
-  // 4. The Output_Guard, before any audio exists.
-  const output = checkOutput(replyText, ctx);
-  const speak = output.decision === "allow" ? replyText : SAFE_REDIRECT[lang][stage];
+  // 3a. A tool call that registered curated text wins over the model's wording (C8): a started
+  // story's first step, or the day's word narration. Both arrive the same way and are treated
+  // the same way, and the model's reply text is discarded.
+  if (spokenText === null) {
+    const pending = deps.stories.takePending(turn.turnId);
+    if (pending === null) {
+      spokenText = replyText;
+    } else {
+      spokenText = pending.speak;
+      curated = true;
+      wordRef = pending.wordId;
+      if (pending.story !== null) {
+        storyRef = {
+          content_id: pending.story.contentId,
+          step_id: pending.story.stepId,
+          choice_id: null,
+          outcome: "started",
+        };
+      }
+    }
+  }
 
-  return { speak, lang, ageStage: stage, input, output, tools, transcript };
+  // 4. The Output_Guard, before any audio exists. ONE call site, reached by every branch above,
+  // because curated text is not trusted to police itself either (Req 3.3, C8).
+  const output = checkOutput(spokenText, ctx);
+  if (output.decision === "allow") {
+    return {
+      speak: spokenText,
+      lang,
+      ageStage: stage,
+      input,
+      output,
+      tools,
+      transcript,
+      curated,
+      story: storyRef,
+      word_id: wordRef,
+    };
+  }
+
+  // A refused curated step takes the same path as any other refusal, and ends the session: a
+  // story the guard will not speak is not one to stay inside (Req 3.4).
+  if (storyRef !== null) {
+    deps.stories.end(turn.deviceId, "refused");
+    storyRef = { ...storyRef, outcome: "refused" };
+  }
+  return {
+    speak: SAFE_REDIRECT[lang][stage],
+    lang,
+    ageStage: stage,
+    input,
+    output,
+    tools,
+    transcript,
+    curated,
+    story: storyRef,
+    word_id: wordRef,
+  };
 }

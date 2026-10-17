@@ -2,7 +2,7 @@
 // retention tests can drive a whole turn without a socket. Every delay runs on the real
 // Deadlines over the manual test Clock, so a test advances time rather than waiting.
 import { createCaptureSink } from "./capture-sink.js";
-import { createContentStack } from "./content-stack.js";
+import { createContentStack, type ContentStack } from "./content-stack.js";
 import { createTestClock, type TestClock } from "./test-clock.js";
 import { createGatewayLog, type GatewayLog } from "../../src/log/gateway-log.js";
 import { createDeadlines, type Deadlines } from "../../src/deadlines.js";
@@ -165,6 +165,8 @@ export type BrainHarness = Readonly<{
   deadlines: Deadlines;
   log: GatewayLog;
   brain: VoiceBrain;
+  /** The Phase 4 content stack behind the brain, so a test can open or inspect a story. */
+  stack: ContentStack;
   transcripts: TranscriptStore;
   alerts: Alerts;
   views: ConversationTurnView[];
@@ -234,6 +236,7 @@ export function brainHarness(
       opts.llm ?? llmSaying("Lions live in the grassland.", opts.llmDelayMs ?? 0, deadlines, clock),
     tts: opts.tts ?? ttsFrames(5),
     tools,
+    stories: stack.stories,
     context: table,
     transcripts,
     alerts,
@@ -247,6 +250,7 @@ export function brainHarness(
     deadlines,
     log,
     brain,
+    stack,
     transcripts,
     alerts,
     views,

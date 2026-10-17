@@ -164,7 +164,9 @@ describe("operations", () => {
     const h = await harness();
     const choices = json(await rawRequest(port(h)))["choices"] as { utterances: string[] };
     expect(choices.utterances).toEqual([...TEST_UTTERANCE_NAMES]);
-    expect(choices.utterances).toHaveLength(8);
+    // The names come from the table rather than from a pinned count, so adding an utterance is
+    // an addition and not a test edit (Phase 4 Req 22.3).
+    expect(choices.utterances).toHaveLength(TEST_UTTERANCE_NAMES.length);
 
     const turn = json(await post(h, "audio-turn", { utterance: "story" }));
     expect(turn).toMatchObject({ ok: true });

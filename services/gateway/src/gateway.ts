@@ -146,6 +146,13 @@ export class ProviderRefusedError extends Error {
 
 type Listener = { readonly port: number; close(): Promise<void> };
 
+/**
+ * `GatewayLog.add`'s own parameter type: one Log_Entry's fields, before the log stamps them with
+ * `log_ver`, `seq` and `at`. Used by the held seed buffer below, so what is held is exactly what
+ * `add` takes and the flush needs no cast.
+ */
+type HeldLogEntry = Parameters<GatewayLog["add"]>[0];
+
 const BEARER_PREFIX = "Bearer ";
 
 /** The message_in entry for an accepted MQTT message (Req 4.6): identifiers, never values. */
@@ -287,11 +294,15 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   // the gateway is up: the log's first entries stay the lifecycle ones a reader expects —
   // `starting`, the provider checks, then `audio_listening` — and the seed report sits after
   // them rather than ahead of the gateway's own birth.
-  const heldSeedEntries: LogEntryFields[] = [];
+  const heldSeedEntries: HeldLogEntry[] = [];
   const content = createContentStore({
     clock,
     log: {
-      add: ((fields: LogEntryFields) => {
+      // The buffer holds `add`'s own parameter type, so the fields are checked where they are
+      // constructed and the flush below needs no cast. The one cast left is the function's
+      // shape: `add` answers the stored entry, which carries a `seq` only the real log can
+      // issue, and the seed path ignores the answer.
+      add: ((fields: HeldLogEntry) => {
         heldSeedEntries.push(fields);
         return fields;
       }) as GatewayLog["add"],
@@ -367,6 +378,7 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     llm: providers.llm,
     tts: providers.tts,
     tools,
+    stories,
     context: childContext,
     transcripts,
     alerts,
@@ -473,10 +485,14 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
       log.add({ kind: "gateway", state: "audio_listening" });
 
       // The curated library's seed report (Req 2.5), held from composition until the gateway is
-      // up so it cannot precede the lifecycle entries above.
-      for (const fields of heldSeedEntries.splice(0)) {
-        log.add(fields as Parameters<GatewayLog["add"]>[0]);
-      }
+      // up so it cannot precede the lifecycle entries above. A start that fails BEFORE this
+      // point — a refused provider, a listener that cannot bind — drops the report, and that is
+      // left as it is on purpose: moving the flush earlier, or adding one on the failure path,
+      // would put `content_gate` entries inside the lifecycle prefix that four Phase 1.2 and
+      // Phase 3 tests pin, including provider-gate's "the log stops at the gate". It is a
+      // visible change to what a failed start prints, so it is recorded for Omar rather than
+      // made here (Phase 4 wave-1 review finding 3).
+      for (const fields of heldSeedEntries.splice(0)) log.add(fields);
 
       // The Operator_Surface exists only in Local_Mode (Req 13.2), on 127.0.0.1, or on 0.0.0.0
       // with the Listen_All_Argument (Phase 1.3 Req 3.1, superseding Req 13.1).

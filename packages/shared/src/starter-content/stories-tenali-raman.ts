@@ -74,11 +74,16 @@ export const TENALI_RAMAN_SPECS: readonly StarterItemSpec[] = Object.freeze([
       }),
     ]),
   }),
+  // The one BILINGUAL branching retelling, and the Hindi half is load-bearing rather than
+  // decorative: it is the only seeded Content_Choice with `hi-IN` match terms, so without it a
+  // Hindi branch answer — from the panel or from a test — would resolve against nothing
+  // (Phase 4 Req 22.4). Three sentences per spoken step in both languages, which is why the item
+  // declares `explorer` and `maker` only and carries two choices (C39).
   Object.freeze({
     content_id: "story_tenali_riddle",
     kind: "story",
     title: "Tenali and the Sleepy Gatekeeper",
-    languages: Object.freeze(["en-IN"] as const),
+    languages: Object.freeze(["en-IN", "hi-IN"] as const),
     age_stages: WIDE_STAGES,
     categories: Object.freeze(["stories"] as const),
     source: "tenali_raman",
@@ -88,21 +93,30 @@ export const TENALI_RAMAN_SPECS: readonly StarterItemSpec[] = Object.freeze([
         step_id: "s1",
         text: Object.freeze({
           "en-IN": "The palace gate stayed open all night, and the gatekeeper kept yawning.",
+          "hi-IN": "महल का दरवाज़ा रात भर खुला रहा, और पहरेदार जम्हाई लेता रहा।",
         }),
         choices: Object.freeze([
           Object.freeze({
             choice_id: "soup",
-            prompt: Object.freeze({ "en-IN": "Should Tenali bring him warm soup?" }),
+            prompt: Object.freeze({
+              "en-IN": "Should Tenali bring him warm soup?",
+              "hi-IN": "क्या तेनाली उसे गरम सूप दे?",
+            }),
             match_terms: Object.freeze({
               "en-IN": Object.freeze(["soup", "warm", "food", "bring"]),
+              "hi-IN": Object.freeze(["सूप", "गरम", "खाना"]),
             }),
             next_step_id: "s2a",
           }),
           Object.freeze({
             choice_id: "riddle",
-            prompt: Object.freeze({ "en-IN": "Should Tenali ask him a riddle?" }),
+            prompt: Object.freeze({
+              "en-IN": "Should Tenali ask him a riddle?",
+              "hi-IN": "क्या तेनाली उससे पहेली पूछे?",
+            }),
             match_terms: Object.freeze({
               "en-IN": Object.freeze(["riddle", "puzzle", "question", "ask"]),
+              "hi-IN": Object.freeze(["पहेली", "सवाल", "पूछो"]),
             }),
             next_step_id: "s2b",
           }),
@@ -113,6 +127,7 @@ export const TENALI_RAMAN_SPECS: readonly StarterItemSpec[] = Object.freeze([
         step_id: "s2a",
         text: Object.freeze({
           "en-IN": "The warm soup woke him up, and he stood tall again.",
+          "hi-IN": "गरम सूप पीकर वह जाग गया और सीधा खड़ा हो गया।",
         }),
         next_step_id: "s3",
       }),
@@ -120,6 +135,7 @@ export const TENALI_RAMAN_SPECS: readonly StarterItemSpec[] = Object.freeze([
         step_id: "s2b",
         text: Object.freeze({
           "en-IN": "The riddle kept him thinking happily until sunrise.",
+          "hi-IN": "पहेली ने उसे सुबह तक खुशी से सोचने में लगाया।",
         }),
         next_step_id: "s3",
       }),
@@ -127,6 +143,7 @@ export const TENALI_RAMAN_SPECS: readonly StarterItemSpec[] = Object.freeze([
         step_id: "s3",
         text: Object.freeze({
           "en-IN": "Tenali solved the problem with kindness and wit.",
+          "hi-IN": "तेनाली ने दया और सूझबूझ से हल निकाला।",
         }),
         next_step_id: null,
       }),

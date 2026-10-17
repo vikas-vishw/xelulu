@@ -129,7 +129,7 @@ function harness(context: ChildContext = contextOf()) {
       nowMinutes: () => 12 * 60,
     }),
   });
-  return { clock, log, tools, context, sent };
+  return { clock, log, tools, context, sent, stories: stack.stories, content: stack.content };
 }
 
 /** Narrows a pipeline outcome to a decision, failing the test if it failed. */
@@ -143,7 +143,12 @@ describe("a plain turn", () => {
     const h = harness();
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("Lions live in the grassland."), tools: h.tools },
+        {
+          llm: llmSaying("Lions live in the grassland."),
+          tools: h.tools,
+          stories: h.stories,
+          clock: h.clock,
+        },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -168,6 +173,8 @@ describe("a plain turn", () => {
             { name: "content_lookup", args: { category: "stories" } },
           ]),
           tools: h.tools,
+          stories: h.stories,
+          clock: h.clock,
         },
         { deviceId: DEVICE, turnId: TURN_ID, stt: sttSaying("a story please"), context: h.context },
       ),
@@ -184,7 +191,7 @@ describe("the deferral path", () => {
     const spy = vi.spyOn(llm, "reply");
     const result = decided(
       await decideTurn(
-        { llm, tools: h.tools },
+        { llm, tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -205,7 +212,7 @@ describe("the deferral path", () => {
     const h = harness(contextOf({ deferTopics: ["thunderstorm"] }));
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("x"), tools: h.tools },
+        { llm: llmSaying("x"), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -224,7 +231,7 @@ describe("the deferral path", () => {
     const spy = vi.spyOn(llm, "reply");
     const result = decided(
       await decideTurn(
-        { llm, tools: h.tools },
+        { llm, tools: h.tools, stories: h.stories, clock: h.clock },
         { deviceId: DEVICE, turnId: TURN_ID, stt: sttSaying("i am very sad"), context: h.context },
       ),
     );
@@ -239,7 +246,12 @@ describe("the refusal path", () => {
     const h = harness();
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("Visit youtube.com for more."), tools: h.tools },
+        {
+          llm: llmSaying("Visit youtube.com for more."),
+          tools: h.tools,
+          stories: h.stories,
+          clock: h.clock,
+        },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -265,7 +277,7 @@ describe("the refusal path", () => {
     const h = harness();
     const result = decided(
       await decideTurn(
-        { llm: llmSaying(reply), tools: h.tools },
+        { llm: llmSaying(reply), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -283,7 +295,7 @@ describe("the refusal path", () => {
     const long = "One. Two. Three. Four.";
     const result = decided(
       await decideTurn(
-        { llm: llmSaying(long), tools: h.tools },
+        { llm: llmSaying(long), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -299,7 +311,7 @@ describe("the refusal path", () => {
   it("reports a provider failure as a cause rather than throwing", async () => {
     const h = harness();
     const outcome = await decideTurn(
-      { llm: llmSaying("x"), tools: h.tools },
+      { llm: llmSaying("x"), tools: h.tools, stories: h.stories, clock: h.clock },
       { deviceId: DEVICE, turnId: TURN_ID, stt: sttFailing(), context: h.context },
     );
     expect(outcome).toEqual({ failed: "stt_failed" });
@@ -317,7 +329,12 @@ describe("the turn-wide tool bound", () => {
     }));
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("Let us play instead.", requests), tools: h.tools },
+        {
+          llm: llmSaying("Let us play instead.", requests),
+          tools: h.tools,
+          stories: h.stories,
+          clock: h.clock,
+        },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -339,7 +356,12 @@ describe("the multilingual round-trip", () => {
     const h = harness();
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("शेर घास के मैदान में रहते हैं।"), tools: h.tools },
+        {
+          llm: llmSaying("शेर घास के मैदान में रहते हैं।"),
+          tools: h.tools,
+          stories: h.stories,
+          clock: h.clock,
+        },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -357,7 +379,7 @@ describe("the multilingual round-trip", () => {
     const h = harness();
     const defer = decided(
       await decideTurn(
-        { llm: llmSaying("x"), tools: h.tools },
+        { llm: llmSaying("x"), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -371,7 +393,7 @@ describe("the multilingual round-trip", () => {
 
     const refuse = decided(
       await decideTurn(
-        { llm: llmSaying("यूट्यूब पर देखो।"), tools: h.tools },
+        { llm: llmSaying("यूट्यूब पर देखो।"), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,
@@ -388,7 +410,7 @@ describe("the multilingual round-trip", () => {
     const h = harness();
     const result = decided(
       await decideTurn(
-        { llm: llmSaying("Lions are strong."), tools: h.tools },
+        { llm: llmSaying("Lions are strong."), tools: h.tools, stories: h.stories, clock: h.clock },
         {
           deviceId: DEVICE,
           turnId: TURN_ID,

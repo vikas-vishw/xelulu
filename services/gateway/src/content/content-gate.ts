@@ -107,6 +107,12 @@ export const GATE_CACHE_MAX_ENTRIES = 4_096;
  * What it holds is CURATED CONTENT ONLY. `gateItem` is called with Content_Items — seeded prose
  * and operator-submitted drafts — and never with a child's words or a provider's reply, so no
  * transcript or model text can reach this map. It is memory only: no file, no log, no response.
+ *
+ * ONE STANDING DEPENDENCY, recorded rather than assumed: the key is complete only while
+ * `checkOutput` reads nothing from its `GuardContext` but `ageStage`. safety.md §9 item 5
+ * schedules Output_Guard hardening, and a guard that began reading `allowedCategories` or
+ * `deferTopics` would make this cache answer from a stale key — so whoever widens the guard's
+ * inputs must key this map on the whole `GuardContext` in the same change.
  */
 const verdictCache = new Map<string, SafetyVerdict>();
 

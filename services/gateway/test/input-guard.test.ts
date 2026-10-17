@@ -9,6 +9,9 @@
 //   - ordering: a text holding the markers of several classes is decided by the highest-
 //     precedence class present, with the precedence written out here as an independent oracle
 //     rather than read back out of the implementation.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -35,6 +38,7 @@ import {
   checkInput,
   type GuardContext,
 } from "../src/brain/safety/input-guard.js";
+import { FIXTURE_CHILDREN } from "../src/brain/state/child-context.js";
 import { installNoRemoteSockets, type SocketGuard } from "./support/no-remote-sockets.js";
 
 /** Every brain test installs the socket guard: the Safety_Layer reaches no network (Req 22.8). */
@@ -707,6 +711,104 @@ describe("possessive and inflected injury reports (group-5 review pass 4, findin
     // `it` and `that` stay unanchored, so these are still allowed and await a ruling.
     for (const text of ["it hurts", "that hurts"]) {
       expect(checkInput(text, ctx()).decision).toBe("allow");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// The Simulator's Test_Utterances, and the Safety_Decision each one is INTENDED to demonstrate
+// under `FIXTURE_CHILDREN.child_mock_1` (Phase 4 Req 22.5a, 22.6).
+//
+// This test exists because a permissive fixture edit can silently delete a demonstration with
+// every other suite still green: Phase 4's `world` category line turned `scary-request` from a
+// `blocked_category` refusal into an `allow` turn, and no existing `input-guard`, `tool-router`,
+// `turn-pipeline` or `output-guard` test noticed, because each builds its own context.
+//
+// It lives in the Gateway because the decision is the Gateway's; the Simulator holds only the
+// text. The texts are READ from the Simulator's source rather than imported: services are leaves
+// and never import each other, so this parses the table's constants with a regular expression,
+// and a table that stops being parseable fails the test rather than passing it vacuously.
+describe("the Simulator's Test_Utterances under child_mock_1 (Req 22.5a, 22.6)", () => {
+  /** The decision each named utterance must draw. Every entry in the table needs one. */
+  const INTENDED: Readonly<
+    Record<string, Readonly<{ decision: SafetyDecisionName; rule: SafetyRule }>>
+  > = Object.freeze({
+    hello: { decision: "allow", rule: "none" },
+    story: { decision: "allow", rule: "none" },
+    "where-did-grandpa-go": { decision: "defer", rule: "defer_topic" },
+    // NOT a refusal: `checkInput` has no frightening-content rule, and `world` is open to this
+    // child, so the only reason this ever refused is gone (Req 22.1b).
+    "scary-request": { decision: "allow", rule: "none" },
+    // The stack's one input-refusal demonstration: `maths` is still closed (Req 22.1c).
+    "closed-category-request": { decision: "refuse", rule: "blocked_category" },
+    sad: { decision: "comfort", rule: "distress" },
+    "hindi-hello": { decision: "allow", rule: "none" },
+    "mixed-hindi-english": { decision: "allow", rule: "none" },
+    "slow-thinker": { decision: "allow", rule: "none" },
+    "story-answer-en": { decision: "allow", rule: "none" },
+    "story-answer-hi": { decision: "allow", rule: "none" },
+    "story-answer-unmatched": { decision: "allow", rule: "none" },
+    "story-stop": { decision: "allow", rule: "none" },
+  });
+
+  type Utterance = Readonly<{ name: string; lang: SupportedLang; text: string }>;
+
+  /** The Simulator's table, read from its source in field order (name, lang, text). */
+  function readUtterances(): readonly Utterance[] {
+    const source = readFileSync(
+      fileURLToPath(new URL("../../simulator/src/audio/test-utterances.ts", import.meta.url)),
+      "utf8",
+    );
+    const entries: Utterance[] = [];
+    const pattern = /name:\s*"([^"]+)",\s*lang:\s*"([^"]+)",\s*text:\s*"([^"]+)"/gu;
+    for (const match of source.matchAll(pattern)) {
+      const [, name, lang, text] = match;
+      if (name === undefined || lang === undefined || text === undefined) continue;
+      if (!(SUPPORTED_LANGS as readonly string[]).includes(lang)) continue;
+      entries.push({ name, lang: lang as SupportedLang, text });
+    }
+    return entries;
+  }
+
+  /** `FIXTURE_CHILDREN.child_mock_1` as a GuardContext, in the turn's language. */
+  function fixtureCtx(lang: SupportedLang): GuardContext {
+    const child = FIXTURE_CHILDREN["child_mock_1"];
+    if (child === undefined) throw new Error("child_mock_1 missing from FIXTURE_CHILDREN");
+    return {
+      ageStage: child.ageStage,
+      lang,
+      allowedCategories: child.allowedCategories,
+      deferTopics: child.deferTopics,
+    };
+  }
+
+  it("reads the whole table, and every entry has a pinned decision", () => {
+    const utterances = readUtterances();
+    // The floor is the thirteen Req 22.1 names; a new utterance with no pinned decision fails
+    // here rather than quietly demonstrating nothing.
+    expect(utterances.length).toBeGreaterThanOrEqual(Object.keys(INTENDED).length);
+    for (const utterance of utterances) {
+      expect(Object.keys(INTENDED), `${utterance.name} has no pinned decision`).toContain(
+        utterance.name,
+      );
+    }
+    for (const name of Object.keys(INTENDED)) {
+      expect(
+        utterances.map((u) => u.name),
+        `${name} is pinned but not in the table`,
+      ).toContain(name);
+    }
+  });
+
+  it("draws the intended decision for every utterance", () => {
+    for (const utterance of readUtterances()) {
+      const intended = INTENDED[utterance.name];
+      if (intended === undefined) continue; // the test above is what fails for a missing pin
+      const verdict = checkInput(utterance.text, fixtureCtx(utterance.lang));
+      expect(
+        { decision: verdict.decision, rule: verdict.rule },
+        `${utterance.name}: "${utterance.text}"`,
+      ).toEqual(intended);
     }
   });
 });
