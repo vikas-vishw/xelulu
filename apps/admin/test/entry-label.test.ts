@@ -11,7 +11,7 @@ import type {
 
 import { entryLabel } from "../src/log/entry-label";
 
-const base = { log_ver: 2, seq: 1, at: "2026-10-20T10:00:01.250Z" } as const;
+const base = { log_ver: 3, seq: 1, at: "2026-10-20T10:00:01.250Z" } as const;
 const eventFields = {
   device_id: "xlu_000123",
   event_id: "ev_1",

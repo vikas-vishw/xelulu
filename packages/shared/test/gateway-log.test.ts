@@ -12,21 +12,29 @@ import {
   AUDIO_TURN_PHASES,
   BRAIN_TURN_CAUSES,
   BRAIN_TURN_PHASES,
+  CONTENT_GATE_ACTIONS,
+  CONTENT_GATE_OUTCOMES,
   CONTRACT_FIELD_NAMES,
   DEFERRAL_TOPICS,
   GATEWAY_ISSUE_KINDS,
   GATEWAY_LOG_KINDS,
   GATEWAY_LOG_VERSION,
   GATEWAY_STATES,
+  GRANDMA_CALL_STATES,
+  GRANDMA_EVENTS,
+  GRANDMA_REFUSALS,
   INTERRUPT_CAUSES,
   PARENT_ALERT_KINDS,
+  POLICY_REFUSALS,
   PRESENCE_CAUSES,
   PROVIDER_CAPABILITIES,
   PROVIDER_IDS,
+  ROUTINE_TRIGGERS,
   SAFE_ISSUE_LIMITS,
   SAFETY_DECISIONS,
   SAFETY_RULES,
   SAFETY_STAGES,
+  STORY_STEP_OUTCOMES,
   TIMEOUT_CAUSES,
   TOOL_DENIED_REASONS,
   TOOL_OUTCOMES,
@@ -40,6 +48,7 @@ import type {
   BrainTurnLogEntry,
   ButtonAction,
   ButtonName,
+  ContentGateLogEntry,
   ContractIssue,
   ContractIssueKind,
   EventAcceptedLogEntry,
@@ -48,6 +57,7 @@ import type {
   GatewayLogEntryOf,
   GatewayLogKind,
   GatewayStateLogEntry,
+  GrandmaEventLogEntry,
   LoggedEvent,
   MessageInLogEntry,
   MessageOutLogEntry,
@@ -56,8 +66,11 @@ import type {
   ParentAlertLogEntry,
   PresenceLogEntry,
   ProviderCheckLogEntry,
+  ReportBuiltLogEntry,
+  RoutineFiredLogEntry,
   SafeIssue,
   SafetyDecisionLogEntry,
+  StoryStepLogEntry,
   ToolCallLogEntry,
   TouchGesture,
   TouchZone,
@@ -229,16 +242,30 @@ const PHASE_3_KINDS = [
   "transcript_retention",
 ] as const;
 
-describe("Gateway_Log version and kinds (Req 12.1, 12.2; Req 17.1)", () => {
-  it("GATEWAY_LOG_VERSION is 2", () => {
-    expect(GATEWAY_LOG_VERSION).toBe(2);
-    expectTypeOf(GATEWAY_LOG_VERSION).toEqualTypeOf<2>();
+/** The five Phase 4 kinds, appended (C22, Req 15.1). */
+const PHASE_4_KINDS = [
+  "routine_fired",
+  "content_gate",
+  "grandma_event",
+  "story_step",
+  "report_built",
+] as const;
+
+describe("Gateway_Log version and kinds (Req 12.1, 12.2; Req 17.1; Phase 4 Req 15.1)", () => {
+  it("GATEWAY_LOG_VERSION is 3", () => {
+    expect(GATEWAY_LOG_VERSION).toBe(3);
+    expectTypeOf(GATEWAY_LOG_VERSION).toEqualTypeOf<3>();
   });
 
-  it("GATEWAY_LOG_KINDS is the Phase 1.2 ten in order, then the six new ones, each once", () => {
-    expect([...GATEWAY_LOG_KINDS]).toEqual([...PHASE_1_2_KINDS, ...PHASE_3_KINDS]);
+  it("GATEWAY_LOG_KINDS is the Phase 1.2 ten, then the Phase 3 six, then the Phase 4 five", () => {
+    expect([...GATEWAY_LOG_KINDS]).toEqual([
+      ...PHASE_1_2_KINDS,
+      ...PHASE_3_KINDS,
+      ...PHASE_4_KINDS,
+    ]);
     expect(GATEWAY_LOG_KINDS.slice(0, 10)).toEqual([...PHASE_1_2_KINDS]);
-    expect(new Set(GATEWAY_LOG_KINDS).size).toBe(16);
+    expect(GATEWAY_LOG_KINDS.slice(10, 16)).toEqual([...PHASE_3_KINDS]);
+    expect(new Set(GATEWAY_LOG_KINDS).size).toBe(21);
     expectTypeOf<GatewayLogEntry["kind"]>().toEqualTypeOf<GatewayLogKind>();
   });
 });
@@ -345,11 +372,15 @@ type Phase3LogEntry =
 
 /**
  * Fields no entry of any kind may carry (Req 17.3, safety.md §7). This is the Phase 1.2 list
- * without `lang`: the new `lang` field is one of the two Supported_Langs, a closed list, never a
- * free-form tag. `age_stage` is likewise one of four buckets and names nobody.
+ * without `lang` and `content_id`: the Phase 3 `lang` field is one of the two Supported_Langs, a
+ * closed list, never a free-form tag, and the Phase 4 `content_id` is the identifier of a
+ * curated Content_Item — an id of the library, not of a child and not any child's words
+ * (Phase 4 Req 15.3). `age_stage` is likewise one of four buckets and names nobody. The Phase
+ * 1.2 ten are still held against the full `ForbiddenKeys` list by their own assertion above, so
+ * neither exclusion loosens them.
  */
 type ForbiddenKeysEverywhere =
-  | Exclude<ForbiddenKeys, "lang">
+  | Exclude<ForbiddenKeys, "lang" | "content_id">
   | "reply"
   | "reply_text"
   | "transcript_text"
@@ -434,11 +465,93 @@ const PHASE_3_EXAMPLES: readonly Phase3LogEntry[] = [
   },
 ];
 
+type Phase4LogEntry =
+  | RoutineFiredLogEntry
+  | ContentGateLogEntry
+  | GrandmaEventLogEntry
+  | StoryStepLogEntry
+  | ReportBuiltLogEntry;
+
+/** One entry per Phase 4 kind, every field present and null where it has no value (Req 15.5). */
+const PHASE_4_EXAMPLES: readonly Phase4LogEntry[] = [
+  {
+    log_ver: GATEWAY_LOG_VERSION,
+    seq: 120,
+    at: "2026-10-24T10:00:00.000Z",
+    kind: "routine_fired",
+    device_id: "xlu_000123",
+    trigger: "schedule",
+    ref_id: "morning",
+    threshold: null,
+    battery_pct: null,
+    actions: 4,
+    sent: 4,
+    refused: 0,
+    refusal: null,
+  },
+  {
+    log_ver: GATEWAY_LOG_VERSION,
+    seq: 121,
+    at: "2026-10-24T10:00:00.010Z",
+    kind: "content_gate",
+    content_id: "content_draft_7",
+    action: "activate",
+    outcome: "refused",
+    rule: "length",
+    age_stage: "tiny",
+    lang: "en-IN",
+  },
+  {
+    log_ver: GATEWAY_LOG_VERSION,
+    seq: 122,
+    at: "2026-10-24T10:00:00.020Z",
+    kind: "grandma_event",
+    device_id: null,
+    asset_id: null,
+    call_id: null,
+    event: "recording_refused",
+    outcome: "refused",
+    reason: "no_consent",
+    call_state: null,
+  },
+  {
+    log_ver: GATEWAY_LOG_VERSION,
+    seq: 123,
+    at: "2026-10-24T10:00:00.030Z",
+    kind: "story_step",
+    device_id: "xlu_000123",
+    turn_id: "t_9f",
+    content_id: "content_panchatantra_monkey_and_the_drum",
+    step_id: "s2b",
+    choice_id: "c_share",
+    outcome: "spoken",
+  },
+  {
+    log_ver: GATEWAY_LOG_VERSION,
+    seq: 124,
+    at: "2026-10-24T10:00:00.040Z",
+    kind: "report_built",
+    device_id: "xlu_000123",
+    period: "weekly",
+    window_days: 7,
+    turns: 14,
+    play_minutes: 38,
+    routines_completed: 9,
+    stories_heard: 3,
+    words_learned: 4,
+    cry_moments: 0,
+    categories: 4,
+  },
+];
+
 describe("Phase 3 Log_Entry shapes (Req 17.2, 17.3, 17.5)", () => {
-  it("the Phase 1.2 union and the new union together cover every kind", () => {
-    expectTypeOf<Phase12LogEntry | Phase3LogEntry>().toEqualTypeOf<GatewayLogEntry>();
+  it("the Phase 1.2 union and the new unions together cover every kind", () => {
+    expectTypeOf<
+      Phase12LogEntry | Phase3LogEntry | Phase4LogEntry
+    >().toEqualTypeOf<GatewayLogEntry>();
     expectTypeOf<Phase12LogEntry["kind"]>().toEqualTypeOf<(typeof PHASE_1_2_KINDS)[number]>();
     expectTypeOf<Phase3LogEntry["kind"]>().toEqualTypeOf<(typeof PHASE_3_KINDS)[number]>();
+    expectTypeOf<Phase4LogEntry["kind"]>().toEqualTypeOf<(typeof PHASE_4_KINDS)[number]>();
   });
 
   it("each new entry type has exactly the listed fields for its kind", () => {
@@ -498,6 +611,79 @@ describe("Phase 3 Log_Entry shapes (Req 17.2, 17.3, 17.5)", () => {
       }
     }
     expect(PHASE_3_EXAMPLES.map((entry) => entry.kind)).toEqual([...PHASE_3_KINDS]);
+  });
+});
+
+describe("Phase 4 Log_Entry shapes (Req 15.2, 15.3, 15.5, 15.6)", () => {
+  it("each Phase 4 entry type has exactly the listed fields for its kind", () => {
+    expectTypeOf<KeysOf<RoutineFiredLogEntry>>().toEqualTypeOf<
+      | BaseKeys
+      | "device_id"
+      | "trigger"
+      | "ref_id"
+      | "threshold"
+      | "battery_pct"
+      | "actions"
+      | "sent"
+      | "refused"
+      | "refusal"
+    >();
+    expectTypeOf<KeysOf<ContentGateLogEntry>>().toEqualTypeOf<
+      BaseKeys | "content_id" | "action" | "outcome" | "rule" | "age_stage" | "lang"
+    >();
+    expectTypeOf<KeysOf<GrandmaEventLogEntry>>().toEqualTypeOf<
+      | BaseKeys
+      | "device_id"
+      | "asset_id"
+      | "call_id"
+      | "event"
+      | "outcome"
+      | "reason"
+      | "call_state"
+    >();
+    expectTypeOf<KeysOf<StoryStepLogEntry>>().toEqualTypeOf<
+      BaseKeys | "device_id" | "turn_id" | "content_id" | "step_id" | "choice_id" | "outcome"
+    >();
+    expectTypeOf<KeysOf<ReportBuiltLogEntry>>().toEqualTypeOf<
+      | BaseKeys
+      | "device_id"
+      | "period"
+      | "window_days"
+      | "turns"
+      | "play_minutes"
+      | "routines_completed"
+      | "stories_heard"
+      | "words_learned"
+      | "cry_moments"
+      | "categories"
+    >();
+    expectTypeOf<GatewayLogEntryOf<"story_step">>().toEqualTypeOf<StoryStepLogEntry>();
+  });
+
+  it("no Phase 4 entry carries a text, a title, a Media_Handle or an active_child_id", () => {
+    type Phase4Forbidden =
+      | ForbiddenKeysEverywhere
+      | "title"
+      | "step_text"
+      | "prompt"
+      | "answer"
+      | "media_handle"
+      | "narration"
+      | "speech";
+    expectTypeOf<Extract<KeysOf<Phase4LogEntry>, Phase4Forbidden>>().toEqualTypeOf<never>();
+  });
+
+  it("every Phase 4 kind round-trips through JSON unchanged (Req 15.6)", () => {
+    for (const entry of PHASE_4_EXAMPLES) {
+      expect(entry.log_ver).toBe(GATEWAY_LOG_VERSION);
+      const line = JSON.stringify(entry);
+      expect(JSON.parse(line)).toEqual(entry);
+      for (const value of Object.values(entry)) {
+        expect(["string", "number", "boolean", "object"]).toContain(typeof value);
+        if (typeof value === "object") expect(value).toBeNull();
+      }
+    }
+    expect(PHASE_4_EXAMPLES.map((entry) => entry.kind)).toEqual([...PHASE_4_KINDS]);
   });
 });
 
@@ -650,6 +836,11 @@ const EXPECTED_LISTS: readonly (readonly [string, readonly string[], readonly st
       "provider_check",
       "parent_alert",
       "transcript_retention",
+      "routine_fired",
+      "content_gate",
+      "grandma_event",
+      "story_step",
+      "report_built",
     ],
   ],
   [
@@ -1076,5 +1267,87 @@ describe("Phase 3 Gateway_Log constants (Req 17.1, 17.4)", () => {
     const before = snapshot();
     expect(write).toThrow(TypeError);
     expect(snapshot()).toEqual(before);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 4 constants (Req 15.1, 15.4): one frozen list per new closed list, values restated here.
+
+const PHASE_4_LISTS: readonly (readonly [string, readonly string[], readonly string[]])[] = [
+  [
+    "ROUTINE_TRIGGERS",
+    ROUTINE_TRIGGERS,
+    ["schedule", "battery", "play_limit", "grandma_schedule", "manual"],
+  ],
+  [
+    "POLICY_REFUSALS",
+    POLICY_REFUSALS,
+    ["quiet_hours", "play_limit", "movement_off", "action_not_allowed"],
+  ],
+  ["CONTENT_GATE_ACTIONS", CONTENT_GATE_ACTIONS, ["seed", "create", "update", "activate"]],
+  ["CONTENT_GATE_OUTCOMES", CONTENT_GATE_OUTCOMES, ["passed", "refused"]],
+  [
+    "GRANDMA_EVENTS",
+    GRANDMA_EVENTS,
+    [
+      "recording_added",
+      "recording_refused",
+      "recording_withdrawn",
+      "scheduled",
+      "schedule_cancelled",
+      "play_started",
+      "call_requested",
+      "call_ringing",
+      "call_accepted",
+      "call_declined",
+      "call_ended",
+    ],
+  ],
+  [
+    "GRANDMA_REFUSALS",
+    GRANDMA_REFUSALS,
+    [
+      "no_consent",
+      "consent_withdrawn",
+      "consent_wrong_purpose",
+      "other_household",
+      "invalid_field",
+      "at_capacity",
+      "invalid_transition",
+      "policy",
+      "gate_refused",
+    ],
+  ],
+  [
+    "GRANDMA_CALL_STATES",
+    GRANDMA_CALL_STATES,
+    ["idle", "requested", "ringing", "active", "ended", "declined"],
+  ],
+  [
+    "STORY_STEP_OUTCOMES",
+    STORY_STEP_OUTCOMES,
+    ["started", "spoken", "ended", "unresolved", "refused"],
+  ],
+];
+
+describe("Phase 4 Gateway_Log constants (Req 15.1, 15.4)", () => {
+  it.each(PHASE_4_LISTS)("%s holds exactly the stated values in order", (_name, list, expected) => {
+    expect([...list]).toEqual([...expected]);
+    expect(new Set(list).size).toBe(list.length);
+  });
+
+  it.each(PHASE_4_LISTS)("%s is frozen at runtime", (_name, list) => {
+    expect(Object.isFrozen(list)).toBe(true);
+  });
+
+  it("every Phase 4 list is typed as a read-only tuple of its exact values", () => {
+    // Compile-time only.
+    expectTypeOf(CONTENT_GATE_OUTCOMES).toEqualTypeOf<readonly ["passed", "refused"]>();
+    expectTypeOf(POLICY_REFUSALS).toEqualTypeOf<
+      readonly ["quiet_hours", "play_limit", "movement_off", "action_not_allowed"]
+    >();
+    expectTypeOf(STORY_STEP_OUTCOMES).toEqualTypeOf<
+      readonly ["started", "spoken", "ended", "unresolved", "refused"]
+    >();
   });
 });

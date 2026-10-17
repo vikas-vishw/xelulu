@@ -3,7 +3,7 @@
 import { ACK_STATUSES } from "../gateway-contract/index.js";
 
 /** Numbers the Gateway_Log shape (G43). Bump by 1 whenever a kind or field changes. */
-export const GATEWAY_LOG_VERSION = 2 as const;
+export const GATEWAY_LOG_VERSION = 3 as const;
 
 export const GATEWAY_LOG_KINDS = Object.freeze([
   // The Phase 1.2 ten, unchanged and in the same order.
@@ -24,6 +24,12 @@ export const GATEWAY_LOG_KINDS = Object.freeze([
   "provider_check",
   "parent_alert",
   "transcript_retention",
+  // Phase 4, additive (C22).
+  "routine_fired",
+  "content_gate",
+  "grandma_event",
+  "story_step",
+  "report_built",
 ] as const);
 export type GatewayLogKind = (typeof GATEWAY_LOG_KINDS)[number];
 
@@ -218,3 +224,87 @@ export type ParentAlertKind = (typeof PARENT_ALERT_KINDS)[number];
 
 export const TRANSCRIPT_RETENTION_ACTIONS = Object.freeze(["expired", "deleted_all"] as const);
 export type TranscriptRetentionAction = (typeof TRANSCRIPT_RETENTION_ACTIONS)[number];
+
+// ---------------------------------------------------------------------------------------------
+// Phase 4 (C22): the closed lists of the five additive kinds. Log values, not wire values, so
+// none of them touches Document B or proto_ver. The product constant `CHARGE_THRESHOLDS` is
+// deliberately NOT here: it lives in `domain/activity.ts`, because it is a threshold the
+// reminder logic reads, not a log value.
+
+/** Why a scheduled behaviour ran. */
+export const ROUTINE_TRIGGERS = Object.freeze([
+  "schedule",
+  "battery",
+  "play_limit",
+  "grandma_schedule",
+  "manual",
+] as const);
+export type RoutineTrigger = (typeof ROUTINE_TRIGGERS)[number];
+
+/** The policy gate's reasons, shared so a refusal is loggable as a closed enum. */
+export const POLICY_REFUSALS = Object.freeze([
+  "quiet_hours",
+  "play_limit",
+  "movement_off",
+  "action_not_allowed",
+] as const);
+export type PolicyRefusal = (typeof POLICY_REFUSALS)[number];
+
+export const CONTENT_GATE_ACTIONS = Object.freeze([
+  "seed",
+  "create",
+  "update",
+  "activate",
+] as const);
+export type ContentGateAction = (typeof CONTENT_GATE_ACTIONS)[number];
+
+export const CONTENT_GATE_OUTCOMES = Object.freeze(["passed", "refused"] as const);
+export type ContentGateOutcome = (typeof CONTENT_GATE_OUTCOMES)[number];
+
+export const GRANDMA_EVENTS = Object.freeze([
+  "recording_added",
+  "recording_refused",
+  "recording_withdrawn",
+  "scheduled",
+  "schedule_cancelled",
+  "play_started",
+  "call_requested",
+  "call_ringing",
+  "call_accepted",
+  "call_declined",
+  "call_ended",
+] as const);
+export type GrandmaEvent = (typeof GRANDMA_EVENTS)[number];
+
+export const GRANDMA_REFUSALS = Object.freeze([
+  "no_consent",
+  "consent_withdrawn",
+  "consent_wrong_purpose",
+  "other_household",
+  "invalid_field",
+  "at_capacity",
+  "invalid_transition",
+  "policy",
+  /** The playback narration built from the submitted title fails checkOutput (C41, Req 7.7a). */
+  "gate_refused",
+] as const);
+export type GrandmaRefusal = (typeof GRANDMA_REFUSALS)[number];
+
+export const GRANDMA_CALL_STATES = Object.freeze([
+  "idle",
+  "requested",
+  "ringing",
+  "active",
+  "ended",
+  "declined",
+] as const);
+export type GrandmaCallState = (typeof GRANDMA_CALL_STATES)[number];
+
+export const STORY_STEP_OUTCOMES = Object.freeze([
+  "started",
+  "spoken",
+  "ended",
+  "unresolved",
+  "refused",
+] as const);
+export type StoryStepOutcome = (typeof STORY_STEP_OUTCOMES)[number];

@@ -55,6 +55,10 @@ export const FIXTURE_CHILDREN: Readonly<Record<string, ChildContext>> = Object.f
       "stories",
       "songs",
       "animals",
+      // `world` is open so the Word_Of_The_Day is reachable for the child every Compose
+      // criterion and every manual step runs under, while the category gate still applies on
+      // both the turn path and the scheduled path (Phase 4 C38, Req 5.3a).
+      "world",
       "games",
       "feelings",
       "manners",

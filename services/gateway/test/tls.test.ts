@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createServer, type Server, type TLSSocket } from "node:tls";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createStarterContent } from "@xelulu/shared";
 import type { GatewayLogEntry } from "@xelulu/shared";
 
 import { listenWsAudio } from "../src/audio/transport/ws-audio-listener.js";
@@ -185,8 +186,13 @@ describe("certificate failures", () => {
     expect(probe.tcp).toBeGreaterThanOrEqual(2);
     expect(probe.secure).toBe(0);
     expect(probe.received).toBe(0);
-    // The provider gate runs before any listener opens (Phase 3 Req 1.4).
-    expect(entries.map((e) => (e.kind === "gateway" ? e.state : e.kind))).toEqual([
+    // The provider gate runs before any listener opens (Phase 3 Req 1.4). Every entry is
+    // accounted for, in two groups: the lifecycle ones, in order, and the curated library's seed
+    // report, which start() flushes after `audio_listening` — one entry per seeded item (Phase 4
+    // Req 2.5) and nothing to do with a broker attempt. A handshake that failed still adds no
+    // `auth`, no `presence` and no `broker_connected` entry, which is what this test is about.
+    const kinds = entries.map((e) => (e.kind === "gateway" ? e.state : e.kind));
+    expect(kinds.filter((kind) => kind !== "content_gate")).toEqual([
       "starting",
       "provider_check",
       "provider_check",
@@ -194,6 +200,9 @@ describe("certificate failures", () => {
       "audio_listening",
       "stopping",
     ]);
+    expect(kinds.filter((kind) => kind === "content_gate")).toHaveLength(
+      createStarterContent().length,
+    );
     expect(sink.text()).not.toContain(PASSWORD);
   });
 });

@@ -18,7 +18,7 @@ import type {
   TouchZone,
   WakeSource,
 } from "../gateway-contract/index.js";
-import type { AgeStage, SupportedLang } from "../domain/index.js";
+import type { AgeStage, ReportPeriod, SupportedLang } from "../domain/index.js";
 import type {
   AbortCause,
   AckResultOutcome,
@@ -26,18 +26,26 @@ import type {
   AudioTurnPhase,
   BrainTurnCause,
   BrainTurnPhase,
+  ContentGateAction,
+  ContentGateOutcome,
   DeferralTopic,
   GATEWAY_LOG_VERSION,
   GatewayIssueKind,
   GatewayLogKind,
   GatewayState,
+  GrandmaCallState,
+  GrandmaEvent,
+  GrandmaRefusal,
   ParentAlertKind,
+  PolicyRefusal,
   PresenceCause,
   ProviderCapability,
   ProviderId,
+  RoutineTrigger,
   SafetyDecisionName,
   SafetyRule,
   SafetyStage,
+  StoryStepOutcome,
   TimeoutCause,
   ToolDeniedReason,
   ToolOutcome,
@@ -244,6 +252,67 @@ export type TranscriptRetentionLogEntry = LogEntryBase<"transcript_retention"> &
   readonly turns_held: number;
 };
 
+// ---------------------------------------------------------------------------------------------
+// Phase 4 (C22): five additive kinds. No entry has a field for a title, a step text, a choice
+// prompt, a child answer, a Media_Handle, `active_child_id` or a name (Req 15.3). `age_stage`
+// appears as before: four buckets, naming nobody.
+
+export type RoutineFiredLogEntry = LogEntryBase<"routine_fired"> & {
+  readonly device_id: string;
+  readonly trigger: RoutineTrigger;
+  /** The routine, asset or nap id; null for a battery trigger. */
+  readonly ref_id: string | null;
+  /** 20 or 10 for a battery trigger; null otherwise. */
+  readonly threshold: number | null;
+  readonly battery_pct: number | null;
+  readonly actions: number;
+  readonly sent: number;
+  readonly refused: number;
+  readonly refusal: PolicyRefusal | null;
+};
+
+export type ContentGateLogEntry = LogEntryBase<"content_gate"> & {
+  readonly content_id: string;
+  readonly action: ContentGateAction;
+  readonly outcome: ContentGateOutcome;
+  /** The refusing rule, stage and language; all null on a pass. Never the text. */
+  readonly rule: SafetyRule | null;
+  readonly age_stage: AgeStage | null;
+  readonly lang: SupportedLang | null;
+};
+
+export type GrandmaEventLogEntry = LogEntryBase<"grandma_event"> & {
+  readonly device_id: string | null;
+  readonly asset_id: string | null;
+  readonly call_id: string | null;
+  readonly event: GrandmaEvent;
+  readonly outcome: "ok" | "refused";
+  readonly reason: GrandmaRefusal | null;
+  readonly call_state: GrandmaCallState | null;
+};
+
+export type StoryStepLogEntry = LogEntryBase<"story_step"> & {
+  readonly device_id: string;
+  readonly turn_id: string | null;
+  readonly content_id: string;
+  readonly step_id: string;
+  readonly choice_id: string | null;
+  readonly outcome: StoryStepOutcome;
+};
+
+export type ReportBuiltLogEntry = LogEntryBase<"report_built"> & {
+  readonly device_id: string;
+  readonly period: ReportPeriod;
+  readonly window_days: number;
+  readonly turns: number;
+  readonly play_minutes: number;
+  readonly routines_completed: number;
+  readonly stories_heard: number;
+  readonly words_learned: number;
+  readonly cry_moments: number;
+  readonly categories: number;
+};
+
 export type GatewayLogEntry =
   | GatewayStateLogEntry
   | MessageInLogEntry
@@ -260,6 +329,11 @@ export type GatewayLogEntry =
   | ToolCallLogEntry
   | ProviderCheckLogEntry
   | ParentAlertLogEntry
-  | TranscriptRetentionLogEntry;
+  | TranscriptRetentionLogEntry
+  | RoutineFiredLogEntry
+  | ContentGateLogEntry
+  | GrandmaEventLogEntry
+  | StoryStepLogEntry
+  | ReportBuiltLogEntry;
 
 export type GatewayLogEntryOf<K extends GatewayLogKind> = Extract<GatewayLogEntry, { kind: K }>;

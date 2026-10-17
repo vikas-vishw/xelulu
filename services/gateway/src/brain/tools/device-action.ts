@@ -14,7 +14,7 @@
 //  - An ack `reason` is final (Req 9.6). This module sends once and returns. It registers no ack
 //    callback and holds no retry, so there is no code path that could answer a `rejected` with a
 //    replacement command, and no reason string is ever put into text a child could hear.
-import { CMD_ACTIONS, type CmdAction } from "@xelulu/shared";
+import { CMD_ACTIONS, type CmdAction, type PolicyRefusal } from "@xelulu/shared";
 
 import type { CommandRequest, CommandResult } from "../../mqtt/command-sender.js";
 import type { ChildContextTable, DevicePolicy } from "../state/child-context.js";
@@ -54,8 +54,12 @@ const MOVEMENT_ACTIONS: readonly CmdAction[] = Object.freeze(["gesture"]);
 
 export type DeviceActionRequest = Readonly<{ action: CmdAction; data: Record<string, unknown> }>;
 
-/** Why the policy gate refused. A log and test code, never spoken (Req 9.6). */
-export type PolicyRefusal = "quiet_hours" | "play_limit" | "movement_off" | "action_not_allowed";
+/**
+ * Why the policy gate refused. A log and test code, never spoken (Req 9.6). Re-exported from
+ * the shared `POLICY_REFUSALS` list (Phase 4 Req 15.4) so a refusal is loggable as a closed
+ * enum and the four values are listed in exactly one place.
+ */
+export type { PolicyRefusal };
 
 export interface DeviceActions {
   /** Denied with `policy` under quiet hours, a reached play limit, or movement off. */

@@ -82,6 +82,35 @@ const KIND_FIELDS: Readonly<Record<GatewayLogKind, readonly string[]>> = {
   provider_check: ["capability", "provider", "retains", "trains", "outcome"],
   parent_alert: ["device_id", "turn_id", "alert_id", "alert", "confidence", "duration_s", "topic"],
   transcript_retention: ["action", "turns_removed", "turns_held"],
+  // Phase 4 additive kinds (Req 15.2, 15.5). Written here independently of the types, as above,
+  // so the table stays exhaustive over GatewayLogKind and a kind cannot be added without being
+  // listed. Ids, closed enums, counts and times only — no text, title or Media_Handle.
+  routine_fired: [
+    "device_id",
+    "trigger",
+    "ref_id",
+    "threshold",
+    "battery_pct",
+    "actions",
+    "sent",
+    "refused",
+    "refusal",
+  ],
+  content_gate: ["content_id", "action", "outcome", "rule", "age_stage", "lang"],
+  grandma_event: ["device_id", "asset_id", "call_id", "event", "outcome", "reason", "call_state"],
+  story_step: ["device_id", "turn_id", "content_id", "step_id", "choice_id", "outcome"],
+  report_built: [
+    "device_id",
+    "period",
+    "window_days",
+    "turns",
+    "play_minutes",
+    "routines_completed",
+    "stories_heard",
+    "words_learned",
+    "cry_moments",
+    "categories",
+  ],
 };
 
 /** String, finite number, boolean, null, array or plain object, all the way down (Req 12.11). */

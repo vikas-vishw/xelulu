@@ -2,6 +2,7 @@
 // retention tests can drive a whole turn without a socket. Every delay runs on the real
 // Deadlines over the manual test Clock, so a test advances time rather than waiting.
 import { createCaptureSink } from "./capture-sink.js";
+import { createContentStack } from "./content-stack.js";
 import { createTestClock, type TestClock } from "./test-clock.js";
 import { createGatewayLog, type GatewayLog } from "../../src/log/gateway-log.js";
 import { createDeadlines, type Deadlines } from "../../src/deadlines.js";
@@ -17,7 +18,6 @@ import {
   type ChildContext,
   type ChildContextTable,
 } from "../../src/brain/state/child-context.js";
-import { createContentLibrary } from "../../src/brain/tools/content-library.js";
 import { createRoutines } from "../../src/brain/tools/routines.js";
 import { createDeviceActions } from "../../src/brain/tools/device-action.js";
 import { createToolRouter } from "../../src/brain/tools/tool-router.js";
@@ -202,9 +202,11 @@ export function brainHarness(
   };
   const routines = createRoutines(undefined, { [DEVICE]: 0 });
   const sent: { action: string }[] = [];
+  const stack = createContentStack({ clock, log });
   const tools = createToolRouter({
     log,
-    content: createContentLibrary(),
+    content: stack.library,
+    stories: stack.stories,
     routines,
     memory: createMemoryStore(),
     context: table,

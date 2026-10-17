@@ -128,7 +128,7 @@ describe("createStreamClient", () => {
     const s = ctx.latest();
     s.open();
     const entry: GatewayLogEntry = {
-      log_ver: 2,
+      log_ver: 3,
       seq: 7,
       at: "2026-10-20T10:00:01.250Z",
       kind: "gateway",
@@ -155,7 +155,7 @@ describe("createStreamClient", () => {
       JSON.stringify({ ...entry, kind: "nope" }),
       JSON.stringify({ ...entry, seq: 0 }),
       JSON.stringify({ ...entry, seq: 1.5 }),
-      JSON.stringify({ log_ver: 2, seq: 8, kind: "gateway" }),
+      JSON.stringify({ log_ver: 3, seq: 8, kind: "gateway" }),
     ]) {
       s.emit("entry", bad);
     }
@@ -229,7 +229,7 @@ describe("createStreamClient", () => {
     ctx.client.stop();
     expect(s.closed).toBe(true);
     const statesAtStop = [...ctx.states];
-    s.emit("entry", JSON.stringify({ log_ver: 2, seq: 1, at: "x", kind: "gateway" }));
+    s.emit("entry", JSON.stringify({ log_ver: 3, seq: 1, at: "x", kind: "gateway" }));
     s.fail();
     vi.advanceTimersByTime(60_000);
     expect(ctx.entries).toEqual([]);

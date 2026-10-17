@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AGE_STAGES,
   ALLOW_LISTED_TOOLS,
+  CONTENT_CATEGORIES,
   SUPPORTED_LANGS,
   encodeUtteranceFrames,
   type AgeStage,
@@ -38,7 +39,6 @@ import {
   MOCK_LLM_RULES,
   createMockLlm,
 } from "../src/brain/providers/mock-llm.js";
-import { createContentLibrary } from "../src/brain/tools/content-library.js";
 import { MOCK_STT_MAX_SESSION_BYTES, createMockStt } from "../src/brain/providers/mock-stt.js";
 import type { SttResult } from "../src/brain/providers/stt-provider.js";
 import {
@@ -271,11 +271,16 @@ describe("the Mock_Llm rule table (Req 2.5)", () => {
     // model's own text still passed the Output_Guard. Only a live turn showed it, so the
     // agreement is pinned here. The category is also the Child_Context category a parent opens,
     // so a mismatch is a tool call no household can ever satisfy.
-    const known = new Set(createContentLibrary().categories());
+    // Phase 4: `categories()` answers the frozen `CONTENT_CATEGORIES` rather than the store's
+    // contents, so the agreement is read from the shared list directly and the factory is not
+    // called here at all. Requests carrying no `category` are skipped: a word-of-the-day request
+    // has none to carry, and this assertion was never about that rule (Req 20.4a).
+    const known = new Set<string>(CONTENT_CATEGORIES);
     const asked = MOCK_LLM_RULES.flatMap((rule) =>
       rule.toolRequests
         .filter((request) => request.name === "content_lookup")
-        .map((request) => request.args["category"]),
+        .map((request) => request.args["category"])
+        .filter((category) => category !== undefined),
     );
     expect(asked.length).toBeGreaterThan(0);
     for (const category of asked) {

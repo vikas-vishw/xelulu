@@ -6,6 +6,7 @@
 // first, then hello auth, status Heartbeat, event dedupe (barge-in on a new `interrupt`) or ack
 // tracking. The Fake_Reply is the Audio_Server's only TurnResponder (Req 14.2). The
 // Operator_Surface's /v1/stream goes to the Operator_Stream hub, which stop() closes first.
+import { createStarterContent, createStarterWords } from "@xelulu/shared";
 import type {
   ConversationTurnView,
   DeviceSummary,
@@ -26,6 +27,7 @@ import { checkProviders } from "./brain/providers/provider-gate.js";
 import type { LlmProvider } from "./brain/providers/llm-provider.js";
 import type { SttProvider } from "./brain/providers/stt-provider.js";
 import type { TtsProvider } from "./brain/providers/tts-provider.js";
+import { createStorySessions } from "./brain/story/story-session.js";
 import { createContentLibrary } from "./brain/tools/content-library.js";
 import { createDeviceActions } from "./brain/tools/device-action.js";
 import { createRoutines } from "./brain/tools/routines.js";
@@ -33,6 +35,7 @@ import { createToolRouter } from "./brain/tools/tool-router.js";
 import { createVoiceBrain } from "./brain/voice-brain.js";
 import type { Clock } from "./clock.js";
 import type { GatewayConfig } from "./config.js";
+import { createContentStore } from "./content/content-store.js";
 import { createDeadlines } from "./deadlines.js";
 import { createDedupeStore } from "./devices/dedupe-store.js";
 import { createPresence, presenceDeadlineKey, type HeartbeatCause } from "./devices/presence.js";
@@ -276,9 +279,30 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   const alerts = createAlerts({ clock, ids, log });
   const memory = createMemoryStore();
   const routines = createRoutines();
+  // The curated library (Phase 4 C1): seeded from the Starter_Content, gated on the way in, and
+  // in memory only — it writes no file, opens no socket and is gone on restart.
+  //
+  // The store seeds itself at construction and adds one `content_gate` entry per seeded item
+  // (Req 2.5). Composition runs BEFORE start(), so those entries are held here and written when
+  // the gateway is up: the log's first entries stay the lifecycle ones a reader expects —
+  // `starting`, the provider checks, then `audio_listening` — and the seed report sits after
+  // them rather than ahead of the gateway's own birth.
+  const heldSeedEntries: LogEntryFields[] = [];
+  const content = createContentStore({
+    clock,
+    log: {
+      add: ((fields: LogEntryFields) => {
+        heldSeedEntries.push(fields);
+        return fields;
+      }) as GatewayLog["add"],
+    },
+    seed: createStarterContent(),
+  });
+  const stories = createStorySessions({ clock, log, content });
   const tools = createToolRouter({
     log,
-    content: createContentLibrary(),
+    content: createContentLibrary({ content, words: createStarterWords(), clock }),
+    stories,
     routines,
     memory,
     context: childContext,
@@ -447,6 +471,12 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
         },
       });
       log.add({ kind: "gateway", state: "audio_listening" });
+
+      // The curated library's seed report (Req 2.5), held from composition until the gateway is
+      // up so it cannot precede the lifecycle entries above.
+      for (const fields of heldSeedEntries.splice(0)) {
+        log.add(fields as Parameters<GatewayLog["add"]>[0]);
+      }
 
       // The Operator_Surface exists only in Local_Mode (Req 13.2), on 127.0.0.1, or on 0.0.0.0
       // with the Listen_All_Argument (Phase 1.3 Req 3.1, superseding Req 13.1).

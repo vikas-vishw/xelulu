@@ -413,6 +413,32 @@ const EXPECTED_RUNTIME_EXPORTS: readonly string[] = [
   "MOCK_FRAME_MAX_BYTES",
   "encodeUtteranceFrames",
   "decodeUtteranceFrames",
+  // Phase 4 (C2, C3, C4, C22, C28, C36): the content model, the activity and report arithmetic,
+  // the Starter_Content factories, the five new log kinds' lists and the three closed domain
+  // lists. Twenty-three names; `ReportPeriod` and `PolicyRefusal` are types and are not here.
+  "CONTENT_KINDS",
+  "CONTENT_STATUSES",
+  "CONTENT_CATEGORIES",
+  "CONTENT_SOURCES",
+  "ACTIVITY_KINDS",
+  "REPORT_PERIODS",
+  "summariseActivity",
+  "reportWindow",
+  "createStarterContent",
+  "createStarterRoutines",
+  "createStarterWords",
+  "ROUTINE_TRIGGERS",
+  "CHARGE_THRESHOLDS",
+  "POLICY_REFUSALS",
+  "CONTENT_GATE_ACTIONS",
+  "CONTENT_GATE_OUTCOMES",
+  "GRANDMA_EVENTS",
+  "GRANDMA_REFUSALS",
+  "GRANDMA_CALL_STATES",
+  "STORY_STEP_OUTCOMES",
+  "CONSENT_PURPOSES",
+  "VERIFICATION_METHODS",
+  "GRANDMA_ASSET_KINDS",
 ];
 
 const exported = ns as Record<string, unknown>;
@@ -428,14 +454,15 @@ function looksLikeWireMessage(value: unknown): boolean {
 
 describe("@xelulu/shared entry point", () => {
   it("exports exactly the runtime names in the design's public export list", () => {
-    // Phase 1.2 and 1.3 left 158; Phase 3 adds exactly the 18 names its design lists (Req 21.5).
-    expect(EXPECTED_RUNTIME_EXPORTS).toHaveLength(176);
+    // Phase 1.2 and 1.3 left 158; Phase 3 added the 18 names its design lists, reaching 176;
+    // Phase 4 adds exactly the 23 names its design lists (Req 20.5).
+    expect(EXPECTED_RUNTIME_EXPORTS).toHaveLength(199);
     expect(new Set(EXPECTED_RUNTIME_EXPORTS).size).toBe(EXPECTED_RUNTIME_EXPORTS.length);
     expect(Object.keys(ns).sort()).toEqual([...EXPECTED_RUNTIME_EXPORTS].sort());
   });
 
-  it("is at Gateway_Log version 2 (Req 21.5)", () => {
-    expect(ns.GATEWAY_LOG_VERSION).toBe(2);
+  it("is at Gateway_Log version 3 (Phase 4 Req 15.1, C22)", () => {
+    expect(ns.GATEWAY_LOG_VERSION).toBe(3);
   });
 
   it("has no default export", () => {

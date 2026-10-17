@@ -174,7 +174,12 @@ export async function decideTurn(
       // The turn-wide attempt cap, counting refused names too.
       if (attempts >= MAX_TOOL_ATTEMPTS_PER_TURN) break;
       attempts += 1;
-      const result = deps.tools.run({ deviceId: turn.deviceId, turnId: turn.turnId }, request);
+      // The turn's resolved language travels with the turn, so the Tool_Router never has to
+      // re-derive one (Phase 4 Req 3.2d).
+      const result = deps.tools.run(
+        { deviceId: turn.deviceId, turnId: turn.turnId, lang },
+        request,
+      );
       tools.push({ tool: result.tool, outcome: result.ok ? "ok" : result.outcome });
       if (result.ok) {
         toolResults.push({ name: result.tool, text: result.text });

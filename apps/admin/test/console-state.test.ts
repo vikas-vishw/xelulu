@@ -27,12 +27,12 @@ const initial: ConsoleState = {
 };
 
 function gatewayEntry(seq: number): GatewayLogEntry {
-  return { log_ver: 2, seq, at: "2026-10-20T10:00:01.250Z", kind: "gateway", state: "starting" };
+  return { log_ver: 3, seq, at: "2026-10-20T10:00:01.250Z", kind: "gateway", state: "starting" };
 }
 
 function presenceEntry(seq: number): GatewayLogEntry {
   return {
-    log_ver: 2,
+    log_ver: 3,
     seq,
     at: "2026-10-20T10:00:01.250Z",
     kind: "presence",

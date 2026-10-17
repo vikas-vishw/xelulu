@@ -80,6 +80,42 @@ export function entryLabel(entry: GatewayLogEntry): string {
         : `parent alert ${entry.alert} ${entry.alert_id} (${entry.topic})`;
     case "transcript_retention":
       return `transcripts ${entry.action}: ${entry.turns_removed} removed, ${entry.turns_held} held`;
+    case "routine_fired": {
+      // A battery trigger carries a threshold instead of a ref; everything here is a count,
+      // a closed enum or an id.
+      const what =
+        entry.threshold === null
+          ? `routine ${entry.trigger}${entry.ref_id === null ? "" : ` ${entry.ref_id}`}`
+          : `routine ${entry.trigger} ${entry.threshold}%`;
+      let text = `${what}: ${entry.sent} of ${entry.actions} sent`;
+      if (entry.refused > 0) text += `, ${entry.refused} refused`;
+      return entry.refusal === null ? text : `${text} (${entry.refusal})`;
+    }
+    case "content_gate": {
+      const text = `content ${entry.action} ${entry.outcome} ${entry.content_id}`;
+      if (entry.rule === null) return text;
+      // The refusing rule, stage and language, never the text that failed.
+      const where = [entry.age_stage, entry.lang].filter((v) => v !== null).join(" ");
+      return where === "" ? `${text} (${entry.rule})` : `${text} (${entry.rule}) [${where}]`;
+    }
+    case "grandma_event": {
+      const id = entry.asset_id ?? entry.call_id;
+      let text = `grandma ${entry.event} ${entry.outcome}`;
+      if (id !== null) text += ` ${id}`;
+      if (entry.call_state !== null) text += ` [${entry.call_state}]`;
+      return entry.reason === null ? text : `${text} (${entry.reason})`;
+    }
+    case "story_step": {
+      const text = `story ${entry.outcome} ${entry.content_id} ${entry.step_id}`;
+      return entry.choice_id === null ? text : `${text} (${entry.choice_id})`;
+    }
+    case "report_built":
+      // Counts only: a report label names no child and infers nothing (DPDP s.9).
+      return (
+        `report ${entry.period} over ${entry.window_days}d: ${entry.turns} turns, ` +
+        `${entry.play_minutes} play min, ${entry.routines_completed} routines, ` +
+        `${entry.stories_heard} stories`
+      );
     default: {
       const unhandled: never = entry;
       return unhandled;

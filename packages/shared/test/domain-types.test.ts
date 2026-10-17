@@ -181,9 +181,14 @@ describe("domain sources (static scan, Requirement 15)", () => {
   it("finds every domain interface, so the scan is not vacuous", () => {
     expect([...new Set(scannedFields.map((f) => f.iface))].sort()).toEqual(
       [
+        // Phase 4 adds three: ActivityRecord (Req 14.1) and the ContentStep/ContentChoice pair
+        // that carries a Content_Item's spoken steps (Req 1.2).
+        "ActivityRecord",
         "ChildProfile",
         "Consent",
+        "ContentChoice",
         "ContentItemBase",
+        "ContentStep",
         "Device",
         "Event",
         "GlobalContentItem",
@@ -275,8 +280,13 @@ describe("domain runtime values", () => {
       languages: ["en-IN"],
       age_stages: ["little", "explorer"],
       categories: ["fables"],
+      // Phase 4 (C3): the spoken content, the editorial state and the provenance.
+      steps: [],
+      status: "draft",
       licence_note: "original retelling",
+      source: "panchatantra",
       created_at: "2026-10-08T09:30:00Z",
+      updated_at: "2026-10-08T09:30:00Z",
     };
     const householdRow: HouseholdContentItem = { ...base, household_id: "hh_001" };
     const globalRow: GlobalContentItem = { ...base, household_id: null };

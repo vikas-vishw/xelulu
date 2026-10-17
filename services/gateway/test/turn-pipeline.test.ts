@@ -8,9 +8,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createCaptureSink } from "./support/capture-sink.js";
+import { createContentStack } from "./support/content-stack.js";
 import { createTestClock } from "./support/test-clock.js";
 import { createGatewayLog } from "../src/log/gateway-log.js";
-import { createContentLibrary } from "../src/brain/tools/content-library.js";
 import { createRoutines } from "../src/brain/tools/routines.js";
 import { createDeviceActions } from "../src/brain/tools/device-action.js";
 import { createToolRouter } from "../src/brain/tools/tool-router.js";
@@ -111,9 +111,11 @@ function harness(context: ChildContext = contextOf()) {
   };
   const routines = createRoutines(undefined, { [DEVICE]: 0 });
   const sent: unknown[] = [];
+  const stack = createContentStack({ clock, log });
   const tools = createToolRouter({
     log,
-    content: createContentLibrary(),
+    content: stack.library,
+    stories: stack.stories,
     routines,
     memory: createMemoryStore(),
     context: table,

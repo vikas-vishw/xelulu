@@ -18,12 +18,19 @@
 // fixtures (`content-library.ts`, `routines.ts`, `memory-store.ts`) and the one gate that can
 // reach the wire (`device-action.ts`), which checks quiet hours, the play limit and the movement
 // toggle before it sends (safety.md §5).
-import { ALLOW_LISTED_TOOLS, type AllowListedTool, type ToolDeniedReason } from "@xelulu/shared";
+import {
+  ALLOW_LISTED_TOOLS,
+  type AllowListedTool,
+  type SupportedLang,
+  type ToolDeniedReason,
+} from "@xelulu/shared";
 
 import type { GatewayLog } from "../../log/gateway-log.js";
 import type { ChildContextTable } from "../state/child-context.js";
 import type { MemoryStore } from "../state/memory-store.js";
-import type { ContentLibrary } from "./content-library.js";
+import type { StorySessions } from "../story/story-session.js";
+import { wordNarration } from "../story/word-of-the-day.js";
+import type { ContentLibrary, ContentQuery } from "./content-library.js";
 import type { DeviceActions } from "./device-action.js";
 import type { Routines } from "./routines.js";
 
@@ -43,7 +50,21 @@ export type ToolResult =
 /** Three is enough for a child's turn and bounds the work a model can ask for. */
 export const MAX_TOOL_CALLS_PER_TURN = 3;
 
-export type ToolTurn = Readonly<{ deviceId: string; turnId: string }>;
+/**
+ * One turn, as the router sees it. `lang` is the turn's RESOLVED language and is carried here
+ * rather than re-derived from `ctx.langs[0]` (Req 3.2d): in Phase 3 a lookup returned a joined
+ * title list and the difference was inert, but in Phase 4 the language decides which items are
+ * eligible, WHICH CURATED TEXT IS SPOKEN, the Word_Of_The_Day entry and its narration, and the
+ * language a Story_Session is opened with. A bilingual child's Hindi turn would otherwise open
+ * its session on the English first step while the pipeline's later `advance(...)` passed `hi-IN`.
+ */
+export type ToolTurn = Readonly<{ deviceId: string; turnId: string; lang: SupportedLang }>;
+
+/** What a started story tells the model. A FIXED constant, never curated prose (Req 3.2b, C8). */
+export const STORY_START_TOOL_TEXT = "starting a story";
+
+/** What a resolved Word_Of_The_Day tells the model. Also fixed, for the same reason. */
+export const WORD_OF_THE_DAY_TOOL_TEXT = "word of the day ready";
 
 export interface ToolRouter {
   /** Runs allow-listed names only; everything else is denied `not_allow_listed`. */
@@ -67,6 +88,11 @@ export function createToolRouter(
   deps: Readonly<{
     log: Pick<GatewayLog, "add">;
     content: ContentLibrary;
+    /**
+     * The Story_Sessions. This dependency is here, and not inside the Content_Library, because
+     * the router is the only module holding both the resolved item and the turn (C40).
+     */
+    stories: StorySessions;
     routines: Routines;
     memory: MemoryStore;
     device: DeviceActions;
@@ -88,19 +114,29 @@ export function createToolRouter(
     return result;
   }
 
+  /**
+   * The `content_lookup` handler. The three Phase 4 arguments are read narrowly and NONE of them
+   * is logged or echoed: `start` and `word_of_the_day` only on a literal boolean `true`, and
+   * `content_id` through the existing string-only `stringArg` (Req 3.2c).
+   */
   function contentLookup(turn: ToolTurn, args: Readonly<Record<string, unknown>>): ToolResult {
-    const category = stringArg(args, "category");
-    if (category === null) {
-      return { ok: false, tool: "content_lookup", outcome: "error", reason: null };
-    }
     const ctx = deps.context.forDevice(turn.deviceId);
-    const found = deps.content.lookup({
-      category,
-      lang: ctx.langs[0] ?? "en-IN",
-      allowedCategories: ctx.allowedCategories,
-    });
+    const lang = turn.lang; // the turn's resolved language, never ctx.langs[0] (Req 3.2d)
+    const base = { lang, ageStage: ctx.ageStage, allowedCategories: ctx.allowedCategories };
+    const query: ContentQuery =
+      args["word_of_the_day"] === true
+        ? { wordOfTheDay: true, ...base }
+        : {
+            // A missing or non-string category stays `unknown_category`, exactly as before.
+            category: stringArg(args, "category") ?? "",
+            ...base,
+            start: args["start"] === true,
+            contentId: stringArg(args, "content_id") ?? undefined,
+          };
+
+    const found = deps.content.lookup(query);
     if (!found.ok) {
-      // `not_allowed` is a policy refusal; the other two are a miss in the fixture.
+      // `not_allowed` is a policy refusal; the other two are a miss in the library.
       const denied = found.reason === "not_allowed";
       return {
         ok: false,
@@ -108,6 +144,30 @@ export function createToolRouter(
         outcome: denied ? "denied" : "error",
         reason: denied ? "policy" : null,
       };
+    }
+
+    if ("item" in found) {
+      // One call both opens the session and registers the turn's curated utterance, so the story
+      // path cannot register half of itself (C40).
+      const pending = deps.stories.start({
+        deviceId: turn.deviceId,
+        turnId: turn.turnId,
+        item: found.item,
+        lang,
+      });
+      // A null pending means the item had no speakable first step for this language: an error,
+      // never a silent allow, so the model answers in its own words under the Output_Guard.
+      return pending === null
+        ? { ok: false, tool: "content_lookup", outcome: "error", reason: null }
+        : { ok: true, tool: "content_lookup", text: STORY_START_TOOL_TEXT };
+    }
+    if ("word" in found) {
+      deps.stories.putPending(turn.turnId, {
+        speak: wordNarration(found.word, lang, ctx.ageStage),
+        story: null,
+        wordId: found.word.word_id,
+      });
+      return { ok: true, tool: "content_lookup", text: WORD_OF_THE_DAY_TOOL_TEXT };
     }
     return { ok: true, tool: "content_lookup", text: found.titles.join(", ") };
   }

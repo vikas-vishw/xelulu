@@ -244,7 +244,7 @@ describe("registry and auth examples", () => {
       await flush();
       expect(after(h, mark)).toEqual([
         {
-          log_ver: 2,
+          log_ver: 3,
           seq: mark + 1,
           at: expect.any(String) as unknown,
           kind: "message_rejected",

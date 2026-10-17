@@ -18,8 +18,8 @@ import { ALLOW_LISTED_TOOLS, type AllowListedTool, type ToolDeniedReason } from 
 
 import { createTestClock } from "./support/test-clock.js";
 import { createCaptureSink } from "./support/capture-sink.js";
+import { createContentStack } from "./support/content-stack.js";
 import { createGatewayLog } from "../src/log/gateway-log.js";
-import { createContentLibrary } from "../src/brain/tools/content-library.js";
 import { createRoutines } from "../src/brain/tools/routines.js";
 import {
   DEVICE_ACTION_ALLOWED,
@@ -56,7 +56,8 @@ afterEach(() => {
 });
 
 const DEVICE = "xlu_000123";
-const TURN = { deviceId: DEVICE, turnId: "t_router" } as const;
+/** `lang` is the turn's resolved language, carried on the turn since Phase 4 (Req 3.2d). */
+const TURN = { deviceId: DEVICE, turnId: "t_router", lang: "en-IN" } as const;
 
 /**
  * A distinctive name no list carries and no log field spells, so the "never logged" assertion
@@ -112,9 +113,11 @@ function harness(
   const nowMinutes = { value: 12 * 60 };
   const context = contextOf(policy, over);
   const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const stack = createContentStack({ clock, log });
   const router = createToolRouter({
     log,
-    content: createContentLibrary(),
+    content: stack.library,
+    stories: stack.stories,
     routines,
     memory: createMemoryStore(),
     context,
@@ -160,6 +163,20 @@ describe("the allow-list is exact-match and runs before any handler", () => {
           count();
           return [];
         },
+      },
+      stories: {
+        start: () => {
+          count();
+          return null;
+        },
+        inProgress: () => false,
+        advance: () => null,
+        putPending: () => {
+          count();
+        },
+        takePending: () => null,
+        end: () => undefined,
+        sweep: () => undefined,
       },
       routines: {
         lookup: () => {
@@ -232,7 +249,7 @@ describe("the allow-list is exact-match and runs before any handler", () => {
     for (const tool of ALLOW_LISTED_TOOLS) {
       const spy = spyRouter();
       const result = spy.router.run(
-        { deviceId: DEVICE, turnId: `t_${tool}` },
+        { deviceId: DEVICE, turnId: `t_${tool}`, lang: "en-IN" },
         {
           name: tool,
           args: { category: "stories", name: "bedtime", fact: "likes lions", action: "say" },
@@ -326,9 +343,11 @@ describe("device actions are gated before anything is sent", () => {
     const sent: CommandRequest[] = [];
     const context = contextOf({ quietHours: null, playLimitMinutes: 30, movementOn: true });
     const routines = createRoutines(undefined, { [DEVICE]: 30 });
+    const stack = createContentStack({ clock, log });
     const router = createToolRouter({
       log,
-      content: createContentLibrary(),
+      content: stack.library,
+      stories: stack.stories,
       routines,
       memory: createMemoryStore(),
       context,
@@ -409,9 +428,11 @@ describe("device actions are gated before anything is sent", () => {
             routines,
             nowMinutes: () => c.minute,
           });
+          const stack = createContentStack({ clock, log });
           const router = createToolRouter({
             log,
-            content: createContentLibrary(),
+            content: stack.library,
+            stories: stack.stories,
             routines,
             memory: createMemoryStore(),
             context,
@@ -535,7 +556,7 @@ describe("the five tools", () => {
       true,
     );
     const read = h.router.run(
-      { deviceId: DEVICE, turnId: "t_read" },
+      { deviceId: DEVICE, turnId: "t_read", lang: "en-IN" },
       { name: "memory_read", args: {} },
     );
     expect(read.ok && read.text).toContain("likes lions");

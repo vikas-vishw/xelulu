@@ -45,7 +45,7 @@ export function touchAccepted(
   gesture: TouchGesture = "tap",
 ): EventAcceptedLogEntry {
   return {
-    log_ver: 2,
+    log_ver: 3,
     seq,
     at: atFor(seq),
     kind: "event_accepted",
@@ -64,7 +64,7 @@ export function touchAccepted(
 /** A `say` command sent on MQTT; its label is `sent say cmd_<seq>`. */
 export function sayOut(seq: number): MessageOutLogEntry {
   return {
-    log_ver: 2,
+    log_ver: 3,
     seq,
     at: atFor(seq),
     kind: "message_out",
@@ -79,7 +79,7 @@ export function sayOut(seq: number): MessageOutLogEntry {
 /** A `done` ack for a `say` command; its label is `ack done for say cmd_<seq>`. */
 export function sayAckDone(seq: number): AckResultLogEntry {
   return {
-    log_ver: 2,
+    log_ver: 3,
     seq,
     at: atFor(seq),
     kind: "ack_result",
@@ -124,7 +124,7 @@ export function turnView(overrides: Partial<ConversationTurnView> = {}): Convers
 /** A `move` refused by the device; its label is `ack rejected for move cmd_<seq> (picked_up)`. */
 export function moveAckRejected(seq: number): AckResultLogEntry {
   return {
-    log_ver: 2,
+    log_ver: 3,
     seq,
     at: atFor(seq),
     kind: "ack_result",

@@ -44,6 +44,7 @@ xelulu/
 │     │                         ContentItem, GrandmaAsset, Consent, Report
 │     ├─ src/gateway-log/       Gateway_Log types, constants and Safe_Issue helper (not the contract)
 │     ├─ src/mock-audio/        Mock_Audio_Codec for test utterances (not the contract, deleted with the mocks)
+│     ├─ src/starter-content/   curated starter library: original retellings, songs, learning, words, routines
 │     └─ src/index.ts
 ├─ docs/                 source documents (see docs/README.md)
 ├─ tooling/              repo-wide checks, local ESLint rule, fixtures (infrastructure, not a package)

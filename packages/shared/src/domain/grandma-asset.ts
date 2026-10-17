@@ -1,6 +1,8 @@
 import type { IsoDateTime } from "./common.js";
 
-export type GrandmaAssetKind = "story" | "rhyme" | "lullaby" | "message";
+/** Frozen runtime list with the union derived from it (Phase 4 C36), so the list cannot drift. */
+export const GRANDMA_ASSET_KINDS = Object.freeze(["story", "rhyme", "lullaby", "message"] as const);
+export type GrandmaAssetKind = (typeof GRANDMA_ASSET_KINDS)[number];
 
 /** Adult-provided content, stored only with a consent statement on file (safety.md §1). */
 export interface GrandmaAsset {
