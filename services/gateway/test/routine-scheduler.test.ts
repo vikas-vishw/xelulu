@@ -21,9 +21,13 @@ import fc from "fast-check";
 import {
   AGE_STAGES,
   CHARGE_THRESHOLDS,
+  PROTO_VER,
   SUPPORTED_LANGS,
   createStarterRoutines,
   createStarterWords,
+  parseCmdMessage,
+  serialiseCmdMessage,
+  type CmdMessage,
   type RoutineTemplate,
 } from "@xelulu/shared";
 
@@ -113,6 +117,43 @@ describe("the seeded routines (Req 10.1, 10.1a)", () => {
         expect(["say", "animate", "gesture", "led"]).toContain(action.action);
         // No `rainbow` and no flash rate, ever (safety.md §6, Req 9.8).
         if (action.action === "led") expect(["solid", "pulse"]).toContain(action.data["effect"]);
+      }
+    }
+  });
+
+  /**
+   * Every behaviour's `data` through the REAL contract serialiser, in every shape a behaviour can
+   * take. The stack's recording sender stands in for `createCommandSender`, so without this a
+   * missing or mistyped field would read as "published" in every other assertion in this file and
+   * surface only against a live broker (wave-4 review finding 1). `serialiseCmdMessage` is the
+   * same call the sender makes, and it validates `action` and `data` against Document B.
+   */
+  it("serialises every behaviour's payload with the contract's own serialiser", () => {
+    const words = createStarterWords();
+    for (const id of ROUTINE_BEHAVIOUR_IDS) {
+      for (const lang of SUPPORTED_LANGS) {
+        for (const stage of AGE_STAGES) {
+          for (const word of [wordForDay(words, atLocal(12, 0), lang), null]) {
+            const actions = behaviourActions(id, {
+              lang,
+              ageStage: stage,
+              refId: "r_1",
+              word,
+              title: "the kind crow",
+            });
+            for (const action of actions) {
+              const payload = serialiseCmdMessage({
+                proto_ver: PROTO_VER,
+                cmd_id: "cmd_1",
+                action: action.action,
+                data: action.data,
+              } as CmdMessage);
+              const parsed = parseCmdMessage(payload);
+              expect(parsed.ok, `${id} / ${lang} / ${stage} / ${action.action}`).toBe(true);
+              if (parsed.ok) expect(parsed.value.data).toEqual(action.data);
+            }
+          }
+        }
       }
     }
   });

@@ -12,7 +12,13 @@
 // What is logged is a closed enum, an id, and — for a cry alert only — the two numbers the robot
 // is allowed to send: confidence and duration (safety.md §1). No transcript, no name, no topic
 // text, and never `active_child_id`.
-import { type DeferralTopic, type ParentAlertKind } from "@xelulu/shared";
+//
+// Phase 4 adds one thing, on the cry path only (Req 14.1): a cry alert appends one `cry`
+// Activity_Record, so `cry_moments` in a parent's report is a count of the moments the robot
+// comforted. The record carries the `feelings` category, no id and NO number — not even the
+// confidence and duration this module is allowed to log — because an Activity_Record has no
+// field for them and a report counts moments rather than measuring them (Req 14.3).
+import { type ActivityRecord, type DeferralTopic, type ParentAlertKind } from "@xelulu/shared";
 
 import { type Clock, isoAt } from "../../clock.js";
 import type { IdSource } from "../../ids.js";
@@ -65,8 +71,17 @@ export interface Alerts {
   deferredQuestions(): readonly DeferredQuestion[];
 }
 
+/** The Content_Category a comfort moment sits in, for the `cry` Activity_Record (Req 14.1). */
+const CRY_CATEGORY = "feelings";
+
 export function createAlerts(
-  deps: Readonly<{ clock: Clock; ids: IdSource; log: Pick<GatewayLog, "add"> }>,
+  deps: Readonly<{
+    clock: Clock;
+    ids: IdSource;
+    log: Pick<GatewayLog, "add">;
+    /** The Activity_Store, for the `cry` record only (Phase 4 Req 14.1). */
+    activity: Readonly<{ add(input: Omit<ActivityRecord, "activity_id">): ActivityRecord }>;
+  }>,
 ): Alerts {
   const alerts: ParentAlert[] = [];
   const deferred: DeferredQuestion[] = [];
@@ -109,12 +124,22 @@ export function createAlerts(
     },
 
     raiseCryAlert(input) {
+      const at = isoAt(deps.clock.now());
+      // The counted moment, beside the alert: no confidence, no duration and no id (Req 14.3).
+      deps.activity.add({
+        device_id: input.deviceId,
+        kind: "cry",
+        at,
+        ref_id: null,
+        minutes: null,
+        categories: [CRY_CATEGORY],
+      });
       return hold({
         alert_id: alertId(),
         device_id: input.deviceId,
         turn_id: null,
         alert: "cry",
-        at: isoAt(deps.clock.now()),
+        at,
         confidence: input.confidence,
         duration_s: input.durationS,
         topic: null,

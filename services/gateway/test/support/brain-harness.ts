@@ -19,6 +19,9 @@ import {
   type ChildContextTable,
 } from "../../src/brain/state/child-context.js";
 import { createRoutineStore } from "../../src/routines/routine-store.js";
+import { createActivityStore, type ActivityStore } from "../../src/reports/activity-store.js";
+import { createPlayTime } from "../../src/routines/play-time.js";
+import type { FireResult } from "../../src/routines/routine-behaviours.js";
 import { createDeviceActions } from "../../src/brain/tools/device-action.js";
 import { createToolRouter } from "../../src/brain/tools/tool-router.js";
 import { NO_FILLER, type FillerAudio } from "../../src/brain/filler.js";
@@ -48,11 +51,15 @@ export interface FakeTarget extends ReplyTarget {
  * `respond`, and a target without one would transcribe nothing.
  */
 export function createFakeTarget(
-  h: Pick<BrainHarness, "brain">,
+  h: Pick<BrainHarness, "brain" | "clock">,
   deviceId = DEVICE,
   turnId = TURN_ID,
-  /** The turn's accepted `audio_start` instant (Phase 4 C35), which the real Audio_Turn captures. */
-  audioStartMs = 0,
+  /**
+   * The turn's accepted `audio_start` instant (Phase 4 C35), which the real Audio_Turn captures
+   * from the Clock. It defaults to NOW rather than to 0 for the same reason: a turn that started
+   * at the epoch would accrue twenty-nine million play minutes (Req 13.1).
+   */
+  audioStartMs = h.clock.now(),
 ): FakeTarget {
   const stt = h.brain.openStt(deviceId, turnId);
   const frames: Uint8Array[] = [];
@@ -172,8 +179,16 @@ export type BrainHarness = Readonly<{
   stack: ContentStack;
   transcripts: TranscriptStore;
   alerts: Alerts;
+  /** The Phase 4 Activity_Store the brain and the cry path write to (Req 14.1). */
+  activity: ActivityStore;
   views: ConversationTurnView[];
   sent: { action: string }[];
+  /**
+   * How many times Play_Accrual asked for a Nap_Sequence. The real nap goes through the real
+   * Device_Policy_Gate, which is `play-limit.test.ts`'s business over the routine stack; here it
+   * is counted so a brain test can see that a turn's accrual reached the real `accruePlay`.
+   */
+  naps: () => number;
   entries: () => readonly GatewayLogEntry[];
   context: ChildContext;
 }>;
@@ -223,7 +238,22 @@ export function brainHarness(
     }),
   });
   const transcripts = createTranscriptStore({ clock, deadlines, log });
-  const alerts = createAlerts({ clock, ids: randomIds, log });
+  const activity = createActivityStore({ ids: randomIds });
+  const alerts = createAlerts({ clock, ids: randomIds, log, activity });
+  // Play_Accrual exactly as the composition root builds it, over the same Routine_Store and the
+  // same Child_Context table. `fireNap` is counted rather than sent: the nap's own path through
+  // the unchanged gate is asserted over the routine stack, where the gate is the real one.
+  let napCount = 0;
+  const play = createPlayTime({
+    clock,
+    routines,
+    context: table,
+    activity,
+    fireNap: (): FireResult => {
+      napCount += 1;
+      return { actions: 0, sent: 0, refused: 0, refusal: null };
+    },
+  });
   const views: ConversationTurnView[] = [];
 
   const brain = createVoiceBrain({
@@ -240,6 +270,9 @@ export function brainHarness(
     tts: opts.tts ?? ttsFrames(5),
     tools,
     stories: stack.stories,
+    content: stack.content,
+    activity,
+    play,
     context: table,
     transcripts,
     alerts,
@@ -256,8 +289,10 @@ export function brainHarness(
     stack,
     transcripts,
     alerts,
+    activity,
     views,
     sent,
+    naps: () => napCount,
     entries: () => log.since(0),
     context,
   };

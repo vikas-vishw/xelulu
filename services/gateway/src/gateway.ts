@@ -294,7 +294,11 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   // read and no socket is opened by any of them.
   const childContext = createChildContextTable();
   const transcripts = createTranscriptStore({ clock, deadlines, log });
-  const alerts = createAlerts({ clock, ids, log });
+  // The Activity_Store (Phase 4 Req 14.1): the counted things that happened, in memory, bounded
+  // and lost on restart. Built here, ahead of its writers — the Parent_Alerts' cry path, the
+  // Voice_Brain's turn path, the Routine_Scheduler and Play_Accrual — so all four share one.
+  const activity = createActivityStore({ ids });
+  const alerts = createAlerts({ clock, ids, log, activity });
   const memory = createMemoryStore();
   // One Routine_Store serves `routine_lookup`, the Device_Policy_Gate's `playMinutesUsed` read
   // and the Routine_Scheduler, seeded from the Starter_Content's six templates — the one source
@@ -348,7 +352,6 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   // Routines, reminders, the Grandma schedules and the play ledger. The pair below is bound in
   // one direction each: `createPlayTime` takes `fireNap` from the scheduler, and the scheduler
   // takes `accruePlay` from it, so neither module imports the other's factory (Req 13.5a).
-  const activity = createActivityStore({ ids });
   const consent = createConsentStore({ clock, ids });
   const grandma = createGrandmaStore({
     clock,
@@ -435,6 +438,10 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     tts: providers.tts,
     tools,
     stories,
+    // Read for a finished story's `categories` only; the one play-minute writer; the one store.
+    content,
+    activity,
+    play: playTime,
     context: childContext,
     transcripts,
     alerts,

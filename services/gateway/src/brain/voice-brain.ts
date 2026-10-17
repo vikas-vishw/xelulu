@@ -18,6 +18,11 @@
 //  - Every delay is scheduled on `Deadlines`, so a test drives the whole turn with fake timers.
 //  - When the turn stops for any reason, the deadlines are cancelled and the Stt_Session's buffer
 //    is released, so no audio byte outlives the turn (Req 13, 14.3).
+//
+// Phase 4 adds one more, on the one path where a turn is over (Phase 4 Req 13.1, 14.1): a turn
+// that reached its reply ending appends its Activity_Records and accrues its play minutes. A turn
+// that spoke a Safe_Redirect appends nothing and accrues nothing, so no report and no play ledger
+// counts something the robot did not do.
 import { isoAt, type Clock } from "../clock.js";
 import type { Deadlines } from "../deadlines.js";
 import type { GatewayLog } from "../log/gateway-log.js";
@@ -31,12 +36,16 @@ import type { Alerts } from "./state/alerts.js";
 import type { ChildContextTable } from "./state/child-context.js";
 import type { TranscriptStore } from "./state/transcript-store.js";
 import type { StorySessions } from "./story/story-session.js";
+import { WORD_OF_THE_DAY_CATEGORY } from "./tools/content-library.js";
 import type { ToolRouter } from "./tools/tool-router.js";
 import { decideTurn, type TurnDecision } from "./turn-pipeline.js";
 import { SAFE_REDIRECT } from "./safety/safe-text.js";
 import { startTurnLatency, type TurnLatency } from "./turn-latency.js";
 import type { TurnResponder } from "./turn-responder.js";
+import type { ContentStore } from "../content/content-store.js";
+import type { PlayTime } from "../routines/play-time.js";
 import type {
+  ActivityRecord,
   AgeStage,
   BrainTurnCause,
   BrainTurnPhase,
@@ -61,6 +70,20 @@ export type VoiceBrainDeps = Readonly<{
   tools: ToolRouter;
   /** The curated-story state the pipeline reads; this module only logs what it decided. */
   stories: StorySessions;
+  /**
+   * Read for ONE thing: a finished story's `categories`, for its Activity_Record (Phase 4
+   * Req 14.1). The item is resolved by the id the pipeline already carries, so nothing here
+   * searches the library and no content text is read.
+   */
+  content: Pick<ContentStore, "get">;
+  /** The Activity_Store. Ids, closed enums, counts and times — never text (Phase 4 Req 14.3). */
+  activity: Readonly<{ add(input: Omit<ActivityRecord, "activity_id">): ActivityRecord }>;
+  /**
+   * Play_Accrual: the ONE writer of the play ledger and of the `play` Activity_Record (Phase 4
+   * Req 13.1). This module is one of its three callers and does no arithmetic of its own beyond
+   * the turn's elapsed minutes.
+   */
+  play: Pick<PlayTime, "accruePlay">;
   context: ChildContextTable;
   transcripts: TranscriptStore;
   alerts: Alerts;
@@ -212,6 +235,60 @@ export function createVoiceBrain(deps: VoiceBrainDeps): VoiceBrain {
         return true;
       }
 
+      /**
+       * The turn's Activity_Records and its play minutes, on the one path where the turn is over
+       * (Phase 4 Req 13.1, 14.1, and the design's record-source table). Ids, closed enums, counts
+       * and times: no transcript, no reply text, no step text and no title can reach an
+       * Activity_Record, because the record has no text field at all (Req 14.3).
+       *
+       * A turn that spoke a Safe_Redirect — refused on the way in, or refused on the way out —
+       * appends NOTHING and accrues NOTHING, so neither a report nor the play ledger counts
+       * something the robot did not do. A deferral and a comfort reply are genuine answers to the
+       * child and do count.
+       */
+      function recordTurnActivity(decision: TurnDecision): void {
+        const spokeSafeRedirect =
+          decision.input.decision === "refuse" ||
+          (decision.output !== null && decision.output.decision !== "allow");
+        if (spokeSafeRedirect) return;
+
+        const recordedAt = isoAt(deps.clock.now());
+        const add = (
+          kind: ActivityRecord["kind"],
+          refId: string | null,
+          categories: readonly string[],
+        ): void => {
+          deps.activity.add({
+            device_id: target.deviceId,
+            kind,
+            at: recordedAt,
+            ref_id: refId,
+            minutes: null,
+            categories: [...categories],
+          });
+        };
+
+        add("turn", null, []);
+        // A story counts where the session reached a terminal step and the closing line was
+        // spoken (Req 3.7). A step merely spoken, left unresolved or refused is not a listen.
+        if (decision.story !== null && decision.story.outcome === "ended") {
+          const item = deps.content.get(decision.story.content_id);
+          add("story", decision.story.content_id, item?.categories ?? []);
+        }
+        // `word_id` is non-null exactly when the spoken text WAS the word narration (Req 5.7).
+        if (decision.word_id !== null) add("word", decision.word_id, [WORD_OF_THE_DAY_CATEGORY]);
+        // The ledger, through the one accrual function (Req 13.1): whole minutes from the turn's
+        // accepted `audio_start` to here, at least one. Measured from `audio_start` rather than
+        // from the latency record's `audio_end`, because narrowing a child's play time to the
+        // reply window would under-count it.
+        deps.play.accruePlay(
+          target.deviceId,
+          Math.max(1, Math.ceil((deps.clock.now() - target.audioStartMs) / 60_000)),
+          "turn",
+          null,
+        );
+      }
+
       /** Sends one frame and schedules the next, anchored so the cadence does not drift. */
       function tick(): void {
         if (stopped || ended || target.signal.stopped) return;
@@ -260,6 +337,10 @@ export function createVoiceBrain(deps: VoiceBrainDeps): VoiceBrain {
               framesOut,
             ),
           );
+          // The one reply-ending path, so the one place a turn's Activity_Records are appended
+          // (Phase 4 Req 13.1, 14.1). `decided` is non-null here: frames only exist because the
+          // pipeline answered.
+          if (decided !== null) recordTurnActivity(decided);
           target.finish();
           return;
         }

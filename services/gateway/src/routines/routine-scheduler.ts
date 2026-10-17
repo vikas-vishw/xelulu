@@ -39,6 +39,9 @@ import type { GatewayLog } from "../log/gateway-log.js";
 import { checkOutput } from "../brain/safety/output-guard.js";
 import type { ChildContextTable } from "../brain/state/child-context.js";
 import { localDayKey, localMinutes, wordForDay } from "../brain/story/word-of-the-day.js";
+// The one Content_Category the Word_Of_The_Day is gated on and recorded under, on the turn path
+// and on this one (C38, Req 5.3a): read from its declaration rather than repeated here.
+import { WORD_OF_THE_DAY_CATEGORY } from "../brain/tools/content-library.js";
 import type { DeviceActions } from "../brain/tools/device-action.js";
 import type { GrandmaRecording, GrandmaStore } from "../grandma/grandma-store.js";
 import type { ChargeReminders } from "./charge-reminders.js";
@@ -59,9 +62,6 @@ export const SCHEDULER_TICK_KEY = "routines:tick";
 
 /** The `routine_fired` `ref_id` of a Nap_Sequence, which has no row of its own. */
 export const NAP_REF_ID = "nap";
-
-/** The Content_Category the Word_Of_The_Day sits in, on the turn path and on this one (C38). */
-const WORD_CATEGORY = "world";
 
 /** Which behaviour each charge threshold fires. `battery_20` nods; `battery_10` does not (C37). */
 const BATTERY_BEHAVIOURS: Readonly<Record<number, RoutineBehaviourId>> = Object.freeze({
@@ -243,7 +243,7 @@ export function createRoutineScheduler(
    */
   function morningWord(deviceId: string): WordEntry | null {
     const ctx = deps.context.forDevice(deviceId);
-    if (!ctx.allowedCategories.includes(WORD_CATEGORY)) return null;
+    if (!ctx.allowedCategories.includes(WORD_OF_THE_DAY_CATEGORY)) return null;
     return wordForDay(deps.words, deps.clock.now(), ctx.langs[0] ?? "en-IN");
   }
 
@@ -263,7 +263,7 @@ export function createRoutineScheduler(
       addActivity(deviceId, "routine", routine.routine_id, []);
       // The `say` is a behaviour's first action, so `sent >= 1` is exactly "the word was spoken"
       // (Req 5.7). A `morning` firing therefore appends BOTH a `routine` and a `word` record.
-      if (word !== null) addActivity(deviceId, "word", word.word_id, [WORD_CATEGORY]);
+      if (word !== null) addActivity(deviceId, "word", word.word_id, [WORD_OF_THE_DAY_CATEGORY]);
       deps.play.accruePlay(deviceId, 1, "routine", routine.routine_id);
     }
     return result(fired);
