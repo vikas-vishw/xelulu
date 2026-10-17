@@ -63,6 +63,8 @@ export interface RoutineStore extends Routines {
   dueAt(nowMinutes: number, dayKey: string): readonly Routine[];
   /** False when this routine already fired on `dayKey`, so a caller cannot double-fire. */
   markFired(routineId: string, dayKey: string): boolean;
+  /** Read-only: whether this routine already fired on `dayKey`. Marks nothing (Req 16.5). */
+  firedOn(routineId: string, dayKey: string): boolean;
   /**
    * Records minutes and answers the day's total BEFORE and AFTER, which is what makes the
    * Nap_Sequence crossing detectable without changing the gate (C18, Req 13.2). Called only by
@@ -165,6 +167,8 @@ export function createRoutineStore(
       fired.set(routineId, dayKey);
       return true;
     },
+
+    firedOn: (routineId, dayKey) => fired.get(routineId) === dayKey,
 
     addPlayMinutes(deviceId, minutes, dayKey) {
       const key = playKey(dayKey, deviceId);

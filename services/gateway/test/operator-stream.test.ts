@@ -338,6 +338,7 @@ describe("Operator_Stream over the loopback Operator_Surface", () => {
       method: "GET",
       path: OPERATOR_STREAM_PATH,
       query: {},
+      queryKeys: [],
       host: `127.0.0.1:${p}`,
       origin: undefined,
       contentType: undefined,

@@ -3,19 +3,21 @@
 // `hashchange`.
 import { useSyncExternalStore } from "react";
 
-export type ConsolePage = "dashboard" | "live" | "conversation";
+export type ConsolePage = "dashboard" | "live" | "conversation" | "content";
 
 /** The hash that opens each page, for nav links. */
 export const PAGE_HASHES: Readonly<Record<ConsolePage, string>> = Object.freeze({
   dashboard: "#/",
   live: "#/live",
   conversation: "#/conversation",
+  content: "#/content",
 });
 
 /** Pure: the page for a `location.hash` value. */
 export function pageFromHash(hash: string): ConsolePage {
   if (hash === PAGE_HASHES.live) return "live";
   if (hash === PAGE_HASHES.conversation) return "conversation";
+  if (hash === PAGE_HASHES.content) return "content";
   return "dashboard";
 }
 

@@ -32,17 +32,27 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Path and query from the request target; the query object has no prototype. */
-function splitTarget(target: string): { path: string; query: Record<string, string> } {
+/**
+ * Path and query from the request target; the query object has no prototype. A repeated key keeps
+ * its FIRST value, and every key is also listed in `queryKeys` in arrival order WITH its repeats,
+ * so a route can refuse a repeated key rather than resolve it (Req 16.1a).
+ */
+function splitTarget(target: string): {
+  path: string;
+  query: Record<string, string>;
+  queryKeys: string[];
+} {
   const q = target.indexOf("?");
   const path = q === -1 ? target : target.slice(0, q);
   const query: Record<string, string> = Object.create(null) as Record<string, string>;
+  const queryKeys: string[] = [];
   if (q !== -1) {
     for (const [key, value] of new URLSearchParams(target.slice(q + 1))) {
+      queryKeys.push(key);
       if (!Object.hasOwn(query, key)) query[key] = value;
     }
   }
-  return { path, query };
+  return { path, query, queryKeys };
 }
 
 function send(res: ServerResponse, out: HttpResponseOut, closeAfter = false): void {
@@ -101,7 +111,7 @@ function serveStream(res: ServerResponse, request: HttpRequestIn, openStream: Op
 export const listenOperatorHttp: OperatorListen = (opts) =>
   new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
-      const { path, query } = splitTarget(req.url ?? "/");
+      const { path, query, queryKeys } = splitTarget(req.url ?? "/");
       const head: GuardHead = {
         method: req.method ?? "",
         path,
@@ -138,7 +148,7 @@ export const listenOperatorHttp: OperatorListen = (opts) =>
       req.on("end", () => {
         if (refusedBody) return;
         const body = Buffer.concat(chunks).toString("utf8");
-        const request: HttpRequestIn = { ...head, query, body };
+        const request: HttpRequestIn = { ...head, query, queryKeys, body };
         if (path === OPERATOR_STREAM_PATH) {
           serveStream(res, request, opts.openStream.bind(opts));
           return;

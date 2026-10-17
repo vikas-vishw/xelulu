@@ -14,6 +14,7 @@
     "test": "pnpm build && tsc -p tsconfig.test.json && vitest run && pnpm --filter @xelulu/parent-app test",
     "start:app": "pnpm --filter @xelulu/parent-app start",
     "dev:admin": "pnpm --filter @xelulu/admin dev",
+    "dev:admin:content": "pnpm --filter @xelulu/admin exec vite --mode content-admin",
     "start:gateway": "pnpm --silent --filter @xelulu/gateway start",
     "start:simulator": "pnpm --silent --filter @xelulu/simulator start"
   },

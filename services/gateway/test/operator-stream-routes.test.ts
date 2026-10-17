@@ -21,6 +21,7 @@ function streamRequest(overrides: Partial<HttpRequestIn> = {}): HttpRequestIn {
     method: "GET",
     path: OPERATOR_STREAM_PATH,
     query: {},
+    queryKeys: [],
     host: HOST,
     origin: undefined,
     contentType: undefined,
@@ -42,6 +43,21 @@ const deps: OperatorRouteDeps = {
   conversation: unreachable,
   brain: unreachable,
   deleteAllTranscripts: unreachable,
+  // The Phase 4 content deps, every one of them equally unreachable on the stream path.
+  contentAdmin: unreachable,
+  contentSummaries: unreachable,
+  contentItem: unreachable,
+  contentCreate: unreachable,
+  contentUpdate: unreachable,
+  contentStatus: unreachable,
+  grandmaSnapshot: unreachable,
+  recordConsent: unreachable,
+  addRecording: unreachable,
+  scheduleRecording: unreachable,
+  applyCall: unreachable,
+  routinesSnapshot: unreachable,
+  runRoutine: unreachable,
+  reports: unreachable,
 };
 
 describe("Operator_Stream routes", () => {

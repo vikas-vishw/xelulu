@@ -14,7 +14,11 @@ import { installProcessHandlers } from "./crash.js";
 import { readGatewayConfig } from "./env.js";
 import { createGateway, OperatorListenError, ProviderRefusedError } from "./gateway.js";
 import { randomIds } from "./ids.js";
-import { hasListenAllArgument, operatorTranscriptsEnabled } from "./listen-host.js";
+import {
+  contentAdminEnabled,
+  hasListenAllArgument,
+  operatorTranscriptsEnabled,
+} from "./listen-host.js";
 import { flushStdout, stdoutSink } from "./log/logger.js";
 import { mqttJsConnector } from "./mqtt/transport/mqtt-js-connector.js";
 import { listenOperatorHttp } from "./operator/transport/http-listener.js";
@@ -44,6 +48,9 @@ if (!result.ok) {
     // Local_Mode only, and off unless asked for: outside Local_Mode the argument is ignored
     // entirely, so a hosted gateway cannot be made to emit a child's words (Phase 3 C4).
     operatorTranscripts: operatorTranscriptsEnabled(result.config.localMode, process.argv.slice(2)),
+    // Local_Mode only, and off unless asked for: without it every Operator_Content_Route write
+    // answers 403 before it reads a body byte (Phase 4 C23).
+    contentAdmin: contentAdminEnabled(result.config.localMode, process.argv.slice(2)),
   });
   installProcessHandlers(
     process,

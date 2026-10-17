@@ -511,3 +511,23 @@ export function behaviourActions(
       return [ledAction(LED_DIM)];
   }
 }
+
+/**
+ * The context the action COUNT is measured in. A behaviour's action list has the same length in
+ * every language and at every Age_Stage — only the narration text differs — so one fixed context
+ * answers the question the console asks: how many actions a firing's `sent` should be read
+ * against (Req 16.5). A null title gives `grandma_play` its title-free wording, which is the same
+ * two actions.
+ */
+const COUNT_CONTEXT: BehaviourContext = Object.freeze({
+  lang: "en-IN",
+  ageStage: "little",
+  refId: null,
+  word: null,
+  title: null,
+});
+
+/** How many actions a behaviour sends when nothing refuses it. Pure, total, no state. */
+export function behaviourActionCount(id: RoutineBehaviourId): number {
+  return behaviourActions(id, COUNT_CONTEXT).length;
+}

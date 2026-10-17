@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
-import { DEV_HOST, DEV_PORT, operatorProxy } from "./vite-proxy";
+import { contentAdminMode, DEV_HOST, DEV_PORT, operatorProxy } from "./vite-proxy";
 
 // The repo root holds the one `.env` (two levels up from apps/admin).
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -20,7 +20,10 @@ export default defineConfig(({ command, mode }) => {
   const configured = env["GATEWAY_OPERATOR_PORT"];
   const unset = configured === undefined || configured === "";
   const rawPort = unset ? DEFAULT_OPERATOR_PORT : configured;
-  const proxy = command === "serve" ? operatorProxy(rawPort) : null;
+  // The write routes are forwarded only in content-admin mode, which comes from Vite's `mode`
+  // and not from the environment (Phase 4 Req 18.2, 18.5).
+  const contentAdmin = contentAdminMode(mode);
+  const proxy = command === "serve" ? operatorProxy(rawPort, { contentAdmin }) : null;
 
   if (command === "serve" && unset) {
     // The key name only, never a value.

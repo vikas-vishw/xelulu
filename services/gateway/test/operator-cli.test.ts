@@ -86,6 +86,10 @@ describe("operator CLI", () => {
     ["conversation", ["conversation"]],
     ["brain", ["brain"]],
     ["transcripts delete-all", ["transcripts", "delete-all"]],
+    ["content", ["content"]],
+    ["grandma", ["grandma"]],
+    ["routines", ["routines"]],
+    ["reports", ["reports"]],
   ] as const)("exits 0 with the JSON response for %s", async (_name, args) => {
     const h = await harness();
     await h.online();
@@ -93,6 +97,68 @@ describe("operator CLI", () => {
     expect(result.code).toBe(0);
     expect(result.stderr).toBe("");
     expect(oneJsonLine(result.stdout)).toMatchObject({ ok: true });
+  });
+
+  /** A draft small enough for the surface's unchanged 8 KiB body cap. */
+  const CLI_DRAFT = JSON.stringify({
+    content_id: "content_cli_1",
+    kind: "story",
+    title: "A kind little bird",
+    languages: ["en-IN"],
+    age_stages: ["little"],
+    categories: ["stories"],
+    licence_note: "Original retelling written for Xelulu.",
+    source: "original",
+    steps: [
+      {
+        step_id: "s1",
+        text: { "en-IN": "A little bird found a seed. She shared it with her friend." },
+        choices: [],
+        next_step_id: null,
+      },
+    ],
+  });
+
+  it("reaches all eight writes, which answer content_admin_disabled without the flag", async () => {
+    const h = await harness();
+    await h.online();
+    const port = operatorPort(h);
+    const calls: readonly (readonly string[])[] = [
+      ["content-create", CLI_DRAFT],
+      ["content-update", "content_cli_1", JSON.stringify({ title: "A kinder bird" })],
+      ["content-status", "content_cli_1", "active"],
+      ["grandma-consent", "grandma_recording", "dev-notice-1", "identity_details"],
+      ["grandma-recording", "cns_1", "story", "Nani tells a tale", "en-IN", "120"],
+      ["grandma-schedule", "gma_1", "19:30", "true"],
+      ["grandma-call", HARNESS_DEVICE_ID, "request"],
+      ["routine-run", HARNESS_DEVICE_ID, "morning"],
+    ];
+    for (const args of calls) {
+      const result = await runCli(args, localEnv(port));
+      // The harness gateway runs without the Content_Admin_Argument, so every write is refused —
+      // which is exactly what proves the operation reached its route (Req 16.3, 16.11).
+      expect(result.code, args[0]).toBe(1);
+      expect(result.stderr).toBe("");
+      expect(oneJsonLine(result.stdout)).toEqual({
+        ok: false,
+        error: { code: "content_admin_disabled" },
+      });
+    }
+  });
+
+  it("creates and activates content through the CLI with the flag on", async () => {
+    const h = await startHarness({ localMode: true, contentAdmin: true });
+    cleanups.push(() => h.stop());
+    await h.online();
+    const port = operatorPort(h);
+
+    const created = await runCli(["content-create", CLI_DRAFT], localEnv(port));
+    expect(created.code).toBe(0);
+    const activated = await runCli(["content-status", "content_cli_1", "active"], localEnv(port));
+    expect(activated.code).toBe(0);
+    const read = await runCli(["content", "--id", "content_cli_1"], localEnv(port));
+    expect(read.code).toBe(0);
+    expect(oneJsonLine(read.stdout)).toMatchObject({ ok: true });
   });
 
   it("exits 1 with the error JSON on stdout for an error response", async () => {
@@ -118,6 +184,22 @@ describe("operator CLI", () => {
     ["brain with an extra argument", ["brain", "extra"]],
     ["transcripts with no operation", ["transcripts"]],
     ["transcripts with an unknown operation", ["transcripts", "delete-some"]],
+    ["content with a bad flag", ["content", "--all"]],
+    ["content with an extra argument", ["content", "--id", "content_1", "extra"]],
+    ["grandma with an extra argument", ["grandma", "extra"]],
+    ["reports with an extra argument", ["reports", "extra"]],
+    ["content-create with no draft", ["content-create"]],
+    ["content-create with a draft that is not JSON", ["content-create", "{not-json-arg"]],
+    ["content-update with no patch", ["content-update", "content_1"]],
+    ["content-status with no status", ["content-status", "content_1"]],
+    ["grandma-consent with too few arguments", ["grandma-consent", "grandma_recording"]],
+    [
+      "grandma-recording with a non-numeric duration",
+      ["grandma-recording", "cns_1", "story", "T", "en-IN", "two minutes"],
+    ],
+    ["grandma-schedule with a non-boolean enabled", ["grandma-schedule", "gma_1", "19:30", "yes"]],
+    ["grandma-call with no op", ["grandma-call", HARNESS_DEVICE_ID]],
+    ["routine-run with an empty routine", ["routine-run", HARNESS_DEVICE_ID, ""]],
   ] as const)("exits 2 with one usage line for %s", async (_name, args) => {
     const result = await runCli(args, localEnv(await closedPort()));
     expect(result.code).toBe(2);

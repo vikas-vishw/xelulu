@@ -44,7 +44,12 @@ export type GrandmaCall = Readonly<{
   ended_at: string | null;
 }>;
 
-export type CallOp = "request" | "accept" | "decline" | "end";
+/**
+ * The operations a caller may apply. A frozen list as well as a type, because the Operator route
+ * has to test a submitted string for membership and no runtime code can test against a type.
+ */
+export const CALL_OPS = Object.freeze(["request", "accept", "decline", "end"] as const);
+export type CallOp = (typeof CALL_OPS)[number];
 
 /**
  * Exactly Requirement 9.2's transitions, as data: `idle` → `requested` → `ringing` → `active` →

@@ -116,6 +116,8 @@ export type HarnessOptions = HarnessConfigOptions &
     realProviders?: boolean;
     /** Passed to `GatewayDeps.operatorTranscripts` (Phase 3 C4); omitted by default. */
     operatorTranscripts?: boolean;
+    /** Passed to `GatewayDeps.contentAdmin` (Phase 4 C23); omitted by default, so writes are off. */
+    contentAdmin?: boolean;
   }>;
 
 export interface Harness {
@@ -226,6 +228,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     ...(opts.operatorTranscripts === undefined
       ? {}
       : { operatorTranscripts: opts.operatorTranscripts }),
+    ...(opts.contentAdmin === undefined ? {} : { contentAdmin: opts.contentAdmin }),
   });
   gateway.log.subscribe((e) => entries.push(e));
   const device = createFakeDevice({

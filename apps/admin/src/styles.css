@@ -278,6 +278,124 @@ a {
   color: var(--xl-title);
 }
 
+/* Content and AI (layout only; every colour comes from the palette above) */
+
+.content-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: anywhere;
+  margin-bottom: 1rem;
+}
+
+.content-table caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 0.5rem;
+  font-weight: 700;
+  color: var(--xl-title);
+}
+
+.content-table th,
+.content-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--xl-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.content-table thead th {
+  background-color: var(--xl-surface);
+  color: var(--xl-title);
+}
+
+.content-empty,
+.content-writes-off,
+.content-note,
+.content-refusal {
+  padding: 0.75rem;
+  border: 1px dashed var(--xl-border);
+  border-radius: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.content-form {
+  padding: 0.75rem;
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.content-form h3,
+.content-form h4 {
+  margin: 0 0 0.5rem;
+  color: var(--xl-title);
+  font-size: 1.1rem;
+}
+
+.content-form-note {
+  margin-bottom: 0.75rem;
+}
+
+.content-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.content-field label {
+  min-width: 14rem;
+  font-weight: 600;
+}
+
+.content-field input,
+.content-field select,
+.content-field textarea {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  color: var(--xl-body);
+  background-color: var(--xl-bg);
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.content-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.content-form-actions button,
+.content-row-actions button {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.75rem;
+  color: var(--xl-body);
+  background-color: var(--xl-bg);
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+}
+
+.content-call-state {
+  margin-bottom: 0.75rem;
+}
+
+.content-routines,
+.content-reports {
+  margin-top: 1.5rem;
+}
+
+.content-routines h3,
+.content-reports h3 {
+  margin: 0 0 0.5rem;
+  color: var(--xl-title);
+  font-size: 1.1rem;
+}
+
 /* Conversation (layout only; every colour comes from the palette above) */
 
 .conversation-summary {

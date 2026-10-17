@@ -27,6 +27,22 @@ export function operatorTranscriptsEnabled(localMode: boolean, argv: readonly st
   return localMode && argv.includes(TRANSCRIPTS_ARGUMENT);
 }
 
+/**
+ * The argument that opens the Admin_Console's write path on the Operator_Surface (Phase 4 C23).
+ * Off by default, and an argument rather than a Panel_Key for the same reason as the two above:
+ * it is a local-surface switch, not an address or a secret.
+ */
+export const CONTENT_ADMIN_ARGUMENT = "--content-admin";
+
+/**
+ * Whether the Operator_Content_Routes may be written to: Local_Mode AND the argument, and
+ * nothing else. Outside Local_Mode the argument is ignored entirely, so a hosted gateway cannot
+ * be given a content editor by adding a flag to its command line.
+ */
+export function contentAdminEnabled(localMode: boolean, argv: readonly string[]): boolean {
+  return localMode && argv.includes(CONTENT_ADMIN_ARGUMENT);
+}
+
 /** 0.0.0.0 only with Local_Mode and the argument; 127.0.0.1 in every other case. */
 export function localSurfaceHost(localMode: boolean, listenAll: boolean): "127.0.0.1" | "0.0.0.0" {
   return localMode && listenAll ? "0.0.0.0" : "127.0.0.1";

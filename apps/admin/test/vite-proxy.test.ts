@@ -7,9 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONSOLE_ORIGINS,
+  CONTENT_ADMIN_MODE,
   DEV_HOST,
   DEV_PORT,
+  READ_PROXY_KEYS,
   STREAM_PROXY_KEY,
+  WRITE_PROXY_KEYS,
+  contentAdminMode,
   operatorProxy,
 } from "../vite-proxy";
 
@@ -19,11 +23,11 @@ const SEP = "://";
 
 type ProxyServer = Parameters<NonNullable<ProxyOptions["configure"]>>[0];
 
-function entryFor(rawPort: string): ProxyOptions {
-  const proxy = operatorProxy(rawPort);
+function entryFor(rawPort: string, key = STREAM_PROXY_KEY): ProxyOptions {
+  const proxy = operatorProxy(rawPort, { contentAdmin: true });
   if (proxy === null) throw new Error("expected a proxy");
-  const entry = proxy[STREAM_PROXY_KEY];
-  if (entry === undefined) throw new Error("expected the stream entry");
+  const entry = proxy[key];
+  if (entry === undefined) throw new Error("expected the entry");
   return entry;
 }
 
@@ -35,12 +39,47 @@ function bypassWith(origin: string | undefined): ReturnType<NonNullable<ProxyOpt
 }
 
 describe("operatorProxy", () => {
-  it("builds one /v1/stream entry targeting loopback at a valid port", () => {
+  it("forwards the stream and the four reads in every mode, and no write", () => {
     const proxy = operatorProxy("8787");
     expect(proxy).not.toBeNull();
-    expect(Object.keys(proxy ?? {})).toEqual([STREAM_PROXY_KEY]);
-    expect(STREAM_PROXY_KEY).toBe("^/v1/stream(\\?|$)");
+    expect(Object.keys(proxy ?? {})).toEqual([...READ_PROXY_KEYS]);
+    expect(READ_PROXY_KEYS).toEqual([
+      "^/v1/stream(\\?|$)",
+      "^/v1/content(\\?|$)",
+      "^/v1/grandma(\\?|$)",
+      "^/v1/routines(\\?|$)",
+      "^/v1/reports(\\?|$)",
+    ]);
+    for (const key of WRITE_PROXY_KEYS) expect(Object.keys(proxy ?? {})).not.toContain(key);
+  });
 
+  it("forwards the eight writes only in content-admin mode: thirteen keys in all", () => {
+    const proxy = operatorProxy("8787", { contentAdmin: true });
+    expect(Object.keys(proxy ?? {})).toEqual([...READ_PROXY_KEYS, ...WRITE_PROXY_KEYS]);
+    expect(READ_PROXY_KEYS).toHaveLength(5);
+    expect(WRITE_PROXY_KEYS).toEqual([
+      "^/v1/content/create(\\?|$)",
+      "^/v1/content/update(\\?|$)",
+      "^/v1/content/status(\\?|$)",
+      "^/v1/grandma/consent(\\?|$)",
+      "^/v1/grandma/recording(\\?|$)",
+      "^/v1/grandma/schedule(\\?|$)",
+      "^/v1/grandma/call(\\?|$)",
+      "^/v1/routines/run(\\?|$)",
+    ]);
+    expect(Object.keys(proxy ?? {})).toHaveLength(13);
+  });
+
+  it("recognises the content-admin mode and nothing else", () => {
+    expect(CONTENT_ADMIN_MODE).toBe("content-admin");
+    expect(contentAdminMode(CONTENT_ADMIN_MODE)).toBe(true);
+    for (const mode of ["development", "production", "content", ""]) {
+      expect(contentAdminMode(mode)).toBe(false);
+    }
+  });
+
+  it("targets loopback at a valid port on every key", () => {
+    expect(STREAM_PROXY_KEY).toBe("^/v1/stream(\\?|$)");
     const entry = entryFor("8787");
     expect(entry.target).toBe(SCHEME + SEP + "127.0.0.1:8787");
     expect(entry.changeOrigin).toBe(true);
@@ -61,6 +100,30 @@ describe("operatorProxy", () => {
     expect(key.test("/v1/stream?x=1")).toBe(true);
     expect(key.test("/v1/streams")).toBe(false);
     expect(key.test("/v1/stream/other")).toBe(false);
+  });
+
+  it("matches `/v1/content?id=`, which a bare string key would not", () => {
+    const key = new RegExp("^/v1/content(\\?|$)");
+    expect(key.test("/v1/content")).toBe(true);
+    expect(key.test("/v1/content?id=content_1")).toBe(true);
+    expect(key.test("/v1/contents")).toBe(false);
+    // The write paths are their own keys, so the read key never swallows them.
+    expect(key.test("/v1/content/create")).toBe(false);
+  });
+
+  it("keeps the Origin and origin-stripping behaviour on a new key", () => {
+    const entry = entryFor("8787", "^/v1/content/create(\\?|$)");
+    expect(entry.target).toBe(SCHEME + SEP + "127.0.0.1:8787");
+    expect(entry.changeOrigin).toBe(true);
+    if (entry.bypass === undefined) throw new Error("expected bypass");
+    expect(
+      entry.bypass(
+        { headers: { origin: SCHEME + SEP + "evil.example" } } as IncomingMessage,
+        undefined,
+        entry,
+      ),
+    ).toBe(false);
+    expect(entry.bypass({ headers: {} } as IncomingMessage, undefined, entry)).toBeUndefined();
   });
 });
 

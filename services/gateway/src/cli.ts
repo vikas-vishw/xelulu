@@ -5,6 +5,16 @@
 //   node dist/cli.js conversation
 //   node dist/cli.js brain
 //   node dist/cli.js transcripts delete-all
+// Phase 4 adds one operation per Operator_Content_Route — twelve of them (Req 16.11) — so every
+// read and every write is reachable from `docker compose exec` with no browser:
+//   content [--id <content_id>] · grandma · routines · reports
+//   content-create <draft-json> · content-update <content_id> <patch-json>
+//   content-status <content_id> <draft|active>
+//   grandma-consent <purpose> <version> <verification_method>
+//   grandma-recording <consent_record_id> <kind> <title> <lang> <duration_s>
+//   grandma-schedule <asset_id> <HH:MM> <true|false> · grandma-call <device_id> <op>
+//   routine-run <device_id> <routine_id>
+// A write answers 403 `content_admin_disabled` unless the gateway runs with --content-admin.
 // It reads the Config through env.ts, calls only 127.0.0.1 at the Config's operator port, and
 // prints the response body as one JSON line on stdout. Exit codes:
 //   0 success response · 1 error response · 2 usage error · 3 surface not reachable within 5 s
@@ -27,7 +37,13 @@ export const CLI_EXIT = Object.freeze({
 
 const USAGE_LINE =
   "usage: cli.js devices | log [--after <seq>] | send <device_id> <action> <data-json>" +
-  " | conversation | brain | transcripts delete-all\n";
+  " | conversation | brain | transcripts delete-all | content [--id <content_id>]" +
+  " | grandma | routines | reports | content-create <draft-json>" +
+  " | content-update <content_id> <patch-json> | content-status <content_id> <status>" +
+  " | grandma-consent <purpose> <version> <method>" +
+  " | grandma-recording <consent_id> <kind> <title> <lang> <duration_s>" +
+  " | grandma-schedule <asset_id> <HH:MM> <true|false> | grandma-call <device_id> <op>" +
+  " | routine-run <device_id> <routine_id>\n";
 const UNREACHABLE_LINE = "operator surface not reachable\n";
 const NOT_LOCAL_LINE = "operator surface is local-only\n";
 
@@ -73,8 +89,131 @@ function parseArgs(args: readonly string[]): Call | null {
       return { method: "POST", path: "/v1/transcripts/delete-all", body: "{}" };
     }
     default:
+      return parseContentArgs(command, rest);
+  }
+}
+
+/** The twelve Operator_Content_Routes (Req 16.11), or null for a usage error. */
+function parseContentArgs(command: string | undefined, rest: readonly string[]): Call | null {
+  switch (command) {
+    case "content": {
+      if (rest.length === 0) return { method: "GET", path: "/v1/content" };
+      const [flag, id] = rest;
+      if (rest.length !== 2 || flag !== "--id" || id === undefined || id === "") return null;
+      return { method: "GET", path: `/v1/content?id=${encodeURIComponent(id)}` };
+    }
+    case "grandma":
+      return rest.length === 0 ? { method: "GET", path: "/v1/grandma" } : null;
+    case "routines":
+      return rest.length === 0 ? { method: "GET", path: "/v1/routines" } : null;
+    case "reports":
+      return rest.length === 0 ? { method: "GET", path: "/v1/reports" } : null;
+    case "content-create": {
+      // The draft is submitted as JSON; the route and the store own every field rule.
+      const draft = jsonArg(rest, 1);
+      return draft === null ? null : { method: "POST", path: "/v1/content/create", body: draft };
+    }
+    case "content-update": {
+      const [contentId] = rest;
+      const patch = jsonArg(rest, 2);
+      if (patch === null || contentId === undefined || contentId === "") return null;
+      return {
+        method: "POST",
+        path: "/v1/content/update",
+        body: JSON.stringify({ content_id: contentId, patch: JSON.parse(patch) as unknown }),
+      };
+    }
+    case "content-status":
+      return body(rest, 2, ([contentId, status]) => ({ content_id: contentId, status }), {
+        method: "POST",
+        path: "/v1/content/status",
+      });
+    case "grandma-consent":
+      return body(
+        rest,
+        3,
+        ([purpose, version, method]) => ({
+          purpose,
+          version,
+          verification_method: method,
+        }),
+        { method: "POST", path: "/v1/grandma/consent" },
+      );
+    case "grandma-recording": {
+      const duration = rest[4];
+      if (duration === undefined || !/^[0-9]+$/.test(duration)) return null;
+      return body(
+        rest,
+        5,
+        ([consentId, kind, title, lang]) => ({
+          consent_record_id: consentId,
+          kind,
+          title,
+          lang,
+          duration_s: Number(duration),
+        }),
+        { method: "POST", path: "/v1/grandma/recording" },
+      );
+    }
+    case "grandma-schedule": {
+      const enabled = rest[2];
+      if (enabled !== "true" && enabled !== "false") return null;
+      return body(
+        rest,
+        3,
+        ([assetId, at]) => ({ asset_id: assetId, at, enabled: enabled === "true" }),
+        {
+          method: "POST",
+          path: "/v1/grandma/schedule",
+        },
+      );
+    }
+    case "grandma-call":
+      return body(rest, 2, ([deviceId, op]) => ({ device_id: deviceId, op }), {
+        method: "POST",
+        path: "/v1/grandma/call",
+      });
+    case "routine-run":
+      return body(
+        rest,
+        2,
+        ([deviceId, routineId]) => ({ device_id: deviceId, routine: routineId }),
+        {
+          method: "POST",
+          path: "/v1/routines/run",
+        },
+      );
+    default:
       return null;
   }
+}
+
+/** The single JSON argument at position `count - 1`, parsed to check it, or null. */
+function jsonArg(rest: readonly string[], count: number): string | null {
+  if (rest.length !== count) return null;
+  const raw = rest[count - 1];
+  if (raw === undefined) return null;
+  try {
+    JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  return raw;
+}
+
+/**
+ * A POST whose body is built from exactly `count` non-empty string arguments. One helper for the
+ * six fixed-shape writes, so no handler repeats the arity and emptiness checks.
+ */
+function body(
+  rest: readonly string[],
+  count: number,
+  build: (args: readonly string[]) => Record<string, unknown>,
+  call: Omit<Call, "body">,
+): Call | null {
+  if (rest.length !== count) return null;
+  if (rest.some((arg) => arg === "")) return null;
+  return { ...call, body: JSON.stringify(build(rest)) };
 }
 
 function writeErr(line: string): void {

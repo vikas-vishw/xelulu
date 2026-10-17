@@ -20,7 +20,13 @@ export type OperatorErrorCode =
   | "device_offline"
   | "broker_disconnected"
   | "invalid_command"
-  | "too_many_streams";
+  | "too_many_streams"
+  // Phase 4 adds exactly these three, and deliberately no `invalid_field`: the singular name is
+  // the Content_Store's and the Grandma_Store's own refusal code, which the route maps onto the
+  // existing `invalid_fields` wire code and its one body shape (Req 16.4a).
+  | "content_admin_disabled"
+  | "unknown_content"
+  | "invalid_transition";
 
 export type GuardHead = Readonly<{
   method: string;

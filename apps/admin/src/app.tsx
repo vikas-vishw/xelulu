@@ -1,10 +1,13 @@
 // Shell of the internal admin console (Req 8.1, 8.2, 8.4, 8.5): the one h1, the stream status in
-// the header, a left nav for the three pages and the page switch. The console is read-only: its
-// only request is the Operator_Stream at its own origin (`/v1/stream`, opened by the stream
-// hook). No env read, no Panel_Key name, no URL literal. Nothing here animates.
+// the header, a left nav for the four pages and the page switch. Its requests are the
+// Operator_Stream and the twelve Operator_Content_Routes, all at its own origin and all through
+// `content/content-client.ts`, which is the console's one `fetch` call site (Phase 4 Req 17.7).
+// No env read, no Panel_Key name, no URL literal. Nothing here animates.
+import { ContentPage } from "./pages/content-page";
 import { ConversationPage } from "./pages/conversation-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { LiveLogPage } from "./pages/live-log-page";
+import type { ContentClient } from "./content/content-client";
 import { PAGE_HASHES, useHashPage } from "./routing/use-hash-page";
 import type { ConsolePage } from "./routing/use-hash-page";
 import { StreamStatus } from "./components/stream-status";
@@ -14,15 +17,18 @@ import type { CreateSource } from "./stream/use-console-stream";
 export type AppProps = Readonly<{
   /** Builds each connection's source; the browser's EventSource unless a test passes a fake. */
   createSource?: CreateSource;
+  /** The Content page's client; the browser's `fetch` unless a test passes a fake. */
+  contentClient?: ContentClient;
 }>;
 
 const NAV_ITEMS: readonly Readonly<{ page: ConsolePage; label: string }>[] = [
   { page: "dashboard", label: "Dashboard" },
   { page: "live", label: "Devices and live log" },
   { page: "conversation", label: "Conversation" },
+  { page: "content", label: "Content and AI" },
 ];
 
-export function App({ createSource = browserEventSource }: AppProps) {
+export function App({ createSource = browserEventSource, contentClient }: AppProps) {
   const state = useConsoleStream(createSource);
   const page = useHashPage();
 
@@ -52,6 +58,12 @@ export function App({ createSource = browserEventSource }: AppProps) {
             <LiveLogPage devices={state.devices} entries={state.entries} />
           ) : page === "conversation" ? (
             <ConversationPage turns={state.turns} />
+          ) : page === "content" ? (
+            // The device id comes from the stream's own device list, so the page guesses none.
+            <ContentPage
+              {...(contentClient === undefined ? {} : { client: contentClient })}
+              deviceId={state.devices?.[0]?.device_id ?? null}
+            />
           ) : (
             <DashboardPage devices={state.devices} />
           )}

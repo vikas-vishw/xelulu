@@ -8,11 +8,15 @@
 // Operator_Surface's /v1/stream goes to the Operator_Stream hub, which stop() closes first.
 import { createStarterContent, createStarterWords } from "@xelulu/shared";
 import type {
+  ConsentPurpose,
   ConversationTurnView,
   DeviceSummary,
   GatewayLogEntryOf,
+  GrandmaAssetKind,
   ProviderCapability,
   ProviderId,
+  SupportedLang,
+  VerificationMethod,
 } from "@xelulu/shared";
 
 import type { AudioListen, AudioSocket } from "./audio/audio-transport.js";
@@ -28,7 +32,7 @@ import type { LlmProvider } from "./brain/providers/llm-provider.js";
 import type { SttProvider } from "./brain/providers/stt-provider.js";
 import type { TtsProvider } from "./brain/providers/tts-provider.js";
 import { createStorySessions } from "./brain/story/story-session.js";
-import { localMinutes } from "./brain/story/word-of-the-day.js";
+import { localDayKey, localMinutes } from "./brain/story/word-of-the-day.js";
 import { createContentLibrary } from "./brain/tools/content-library.js";
 import { createDeviceActions } from "./brain/tools/device-action.js";
 import { createToolRouter } from "./brain/tools/tool-router.js";
@@ -44,8 +48,15 @@ import { createContentStore } from "./content/content-store.js";
 import { createDeadlines } from "./deadlines.js";
 import { createDedupeStore } from "./devices/dedupe-store.js";
 import { createConsentStore } from "./grandma/consent-store.js";
+import { createGrandmaCalls } from "./grandma/grandma-call.js";
 import { createGrandmaStore } from "./grandma/grandma-store.js";
-import { grandmaPlaybackNarration } from "./routines/routine-behaviours.js";
+import { DEV_USER_ID, householdForDevice } from "./grandma/household.js";
+import { createReports } from "./reports/report-builder.js";
+import {
+  behaviourActionCount,
+  behaviourActions,
+  grandmaPlaybackNarration,
+} from "./routines/routine-behaviours.js";
 import { createPresence, presenceDeadlineKey, type HeartbeatCause } from "./devices/presence.js";
 import { createRegistry } from "./devices/registry.js";
 import type { IdSource } from "./ids.js";
@@ -75,7 +86,11 @@ import { createConversationLog } from "./operator/conversation-log.js";
 import { createOperatorStreams, type StreamSink } from "./operator/operator-stream.js";
 import {
   buildBrainSnapshot,
+  buildConsentSummaries,
+  buildContentSummaries,
   buildDevicesSnapshot,
+  buildGrandmaSummaries,
+  buildRoutineSummaries,
   type DevicesSnapshot,
   type ProviderSnapshot,
 } from "./operator/snapshot.js";
@@ -96,6 +111,11 @@ export type GatewayDeps = Readonly<{
    * false, so transcript text never reaches the operator channel unless it was asked for.
    */
   operatorTranscripts?: boolean;
+  /**
+   * Started with the Content_Admin_Argument (Phase 4 C23); counts only in Local_Mode. Default
+   * false, so every Operator_Content_Route write answers 403 before it reads a body byte.
+   */
+  contentAdmin?: boolean;
   /** Test only: providers to use instead of the mocks. Production builds only the mocks (C7). */
   providers?: Readonly<{ stt: SttProvider; llm: LlmProvider; tts: TtsProvider }>;
   /** Phase 3B consumes this; in 3A nothing does (C4). */
@@ -360,6 +380,22 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     consent,
     narration: grandmaPlaybackNarration,
   });
+  // The one source of a `household_id` in this phase, and the one source of a user id (C34,
+  // Req 7.9, 7.9a). No request body names either; `Registry` gains no member for them.
+  const household = (deviceId: string): string | null => householdForDevice(deviceId, registry);
+  const calls = createGrandmaCalls({
+    clock,
+    deadlines,
+    ids,
+    log,
+    actions: deviceActions,
+    context: childContext,
+    household,
+    behaviours: behaviourActions,
+  });
+  // Computed on request only, never cached: a cached summary per child is the shape of a profile
+  // (C20). Built here so `GET /v1/reports` has one instance to call (wave-5 review finding w5-1).
+  const reportBuilder = createReports({ clock, log, activity });
   const playTime = createPlayTime({
     clock,
     routines,
@@ -502,6 +538,86 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     conversation: () => conversationLog.views(),
     brain: () => buildBrainSnapshot({ transcripts, alerts, providers: providerRows }),
     deleteAllTranscripts: () => transcripts.deleteAll(),
+
+    // ----- the Phase 4 Operator_Content_Routes (Req 16). Local_Mode AND the argument, and
+    // nothing else: outside Local_Mode the flag is ignored entirely (C23).
+    contentAdmin: () => config.localMode && (deps.contentAdmin ?? false),
+    contentSummaries: () =>
+      buildContentSummaries({ items: content.list(), verdict: (id) => content.verdict(id) }),
+    contentItem: (contentId) => {
+      const item = content.get(contentId);
+      return item === null ? null : { item, verdict: content.verdict(contentId) };
+    },
+    contentCreate: (draft) => content.create(draft),
+    contentUpdate: (contentId, patch) => content.update(contentId, patch),
+    contentStatus: (contentId, status) => content.setStatus(contentId, status),
+
+    grandmaSnapshot: () => {
+      const householdId = household(config.device.deviceId);
+      if (householdId === null) return { recordings: [], consents: [], call: null };
+      return {
+        recordings: buildGrandmaSummaries({
+          recordings: grandma.recordings(householdId),
+          // A boolean, so the console learns the consent state without reading a consent row.
+          consentLive: (recording) =>
+            consent.isLiveFor(
+              recording.consent_record_id,
+              recording.household_id,
+              "grandma_recording",
+            ),
+        }),
+        consents: buildConsentSummaries(consent.list(householdId)),
+        call: calls.current(config.device.deviceId),
+      };
+    },
+    recordConsent: (input) => {
+      const householdId = household(config.device.deviceId);
+      if (householdId === null) return null;
+      // The two closed enums are cast here and tested for membership inside the store, which is
+      // the one place that rule lives; a bad value is refused naming its field and echoing nothing.
+      return consent.record({
+        household_id: householdId,
+        user_id: DEV_USER_ID,
+        purpose: input.purpose as ConsentPurpose,
+        version: input.version,
+        verification_method: input.verification_method as VerificationMethod,
+      });
+    },
+    addRecording: (input) => {
+      const householdId = household(config.device.deviceId);
+      if (householdId === null) return null;
+      return grandma.add({
+        household_id: householdId,
+        recorded_by_user_id: DEV_USER_ID,
+        consent_record_id: input.consent_record_id,
+        kind: input.kind as GrandmaAssetKind,
+        title: input.title,
+        lang: input.lang as SupportedLang,
+        duration_s: input.duration_s as number,
+      });
+    },
+    scheduleRecording: (assetId, at, enabled) => grandma.schedule(assetId, at, enabled),
+    applyCall: (deviceId, op) => calls.apply(deviceId, op, DEV_USER_ID),
+
+    routinesSnapshot: () => ({
+      routines: buildRoutineSummaries({
+        routines: routines.routines(),
+        actions: (routine) => behaviourActionCount(routine.behaviour),
+        firedToday: (routine) => routines.firedOn(routine.routine_id, localDayKey(clock.now())),
+      }),
+      play_minutes_used: routines.playMinutesUsed(config.device.deviceId),
+    }),
+    runRoutine: (deviceId, routineId) => {
+      // Both refusals name a field and echo no value (Req 16.7).
+      if (household(deviceId) === null) return { ok: false, field: "device_id" };
+      if (routines.byId(routineId) === null) return { ok: false, field: "routine" };
+      // Trigger `manual`, and deliberately no once-per-day mark.
+      return { ok: true, result: scheduler.run(deviceId, routineId, "manual") };
+    },
+    reports: () => ({
+      daily: reportBuilder.build(config.device.deviceId, "daily"),
+      weekly: reportBuilder.build(config.device.deviceId, "weekly"),
+    }),
   };
 
   function stoppingEntry(): GatewayLogEntryOf<"gateway"> {
