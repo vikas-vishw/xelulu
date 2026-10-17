@@ -219,7 +219,10 @@ describe("the built gateway", () => {
       const result = await runGatewayChild(`process.emitWarning("\\u00a7warning-text");\n${crash}`);
       expect(result.stderr).toBe("");
       expect(result.code).toBe(1);
-      expect(result.durationMs).toBeLessThan(5_000);
+      // Proves a prompt exit rather than a hang, so the bound sits well under the 15 s child kill
+      // and the 20 s case timeout: spawning the built gateway under a loaded full-suite run has
+      // been measured past 5 s on a Windows machine, and this assertion is not a latency budget.
+      expect(result.durationMs).toBeLessThan(12_000);
       expect(result.stdout).not.toContain(SECTION);
       const lines = parseLines(result.stdout);
       // The provider gate runs before any listener opens (Phase 3 Req 1.4).
