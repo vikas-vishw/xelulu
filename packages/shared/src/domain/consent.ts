@@ -15,7 +15,16 @@ export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
 export const VERIFICATION_METHODS = Object.freeze(["identity_details", "virtual_token"] as const);
 export type VerificationMethod = (typeof VERIFICATION_METHODS)[number];
 
-/** A verifiable parental consent record: who, what, when and which notice version. */
+/**
+ * One consent record: who, what, when, which notice version, and how the adult was verified.
+ *
+ * The row carries the SHAPE that verifiable parental consent requires (DPDP Act 2023 and the
+ * DPDP Rules 2025, safety.md §2). It does not by itself make a consent verifiable: that depends
+ * on how the record was captured. A record written from the internal loopback console in Phase 4
+ * is a development record against a dev `user_id` and is NOT verifiable parental consent.
+ * Verified capture — an identifiable adult parent, reliable identity details or a virtual token,
+ * and withdrawal as easy as giving — arrives with the backend and the parent app in Phase 5.
+ */
 export interface Consent {
   /** Referenced by `GrandmaAsset.consent_record_id`. */
   consent_id: string;
