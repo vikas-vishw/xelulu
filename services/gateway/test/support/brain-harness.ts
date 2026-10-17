@@ -18,7 +18,7 @@ import {
   type ChildContext,
   type ChildContextTable,
 } from "../../src/brain/state/child-context.js";
-import { createRoutines } from "../../src/brain/tools/routines.js";
+import { createRoutineStore } from "../../src/routines/routine-store.js";
 import { createDeviceActions } from "../../src/brain/tools/device-action.js";
 import { createToolRouter } from "../../src/brain/tools/tool-router.js";
 import { NO_FILLER, type FillerAudio } from "../../src/brain/filler.js";
@@ -51,6 +51,8 @@ export function createFakeTarget(
   h: Pick<BrainHarness, "brain">,
   deviceId = DEVICE,
   turnId = TURN_ID,
+  /** The turn's accepted `audio_start` instant (Phase 4 C35), which the real Audio_Turn captures. */
+  audioStartMs = 0,
 ): FakeTarget {
   const stt = h.brain.openStt(deviceId, turnId);
   const frames: Uint8Array[] = [];
@@ -67,6 +69,7 @@ export function createFakeTarget(
   return {
     deviceId,
     turnId,
+    audioStartMs,
     stt,
     frames,
     sendFrame(frame) {
@@ -202,7 +205,7 @@ export function brainHarness(
     forDevice: () => context,
     childKeyFor: () => "child:test",
   };
-  const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
   const sent: { action: string }[] = [];
   const stack = createContentStack({ clock, log });
   const tools = createToolRouter({

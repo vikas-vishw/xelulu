@@ -11,7 +11,7 @@ import { createCaptureSink } from "./support/capture-sink.js";
 import { createContentStack } from "./support/content-stack.js";
 import { createTestClock } from "./support/test-clock.js";
 import { createGatewayLog } from "../src/log/gateway-log.js";
-import { createRoutines } from "../src/brain/tools/routines.js";
+import { createRoutineStore } from "../src/routines/routine-store.js";
 import { createDeviceActions } from "../src/brain/tools/device-action.js";
 import { createToolRouter } from "../src/brain/tools/tool-router.js";
 import { createMemoryStore } from "../src/brain/state/memory-store.js";
@@ -109,7 +109,7 @@ function harness(context: ChildContext = contextOf()) {
     forDevice: () => context,
     childKeyFor: () => "child:test",
   };
-  const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
   const sent: unknown[] = [];
   const stack = createContentStack({ clock, log });
   const tools = createToolRouter({

@@ -12,6 +12,16 @@ export interface ReplyTarget {
   readonly deviceId: string;
   readonly turnId: string;
   /**
+   * The Clock instant the turn's accepted `audio_start` was handled (Phase 4 C35, Req 13.1).
+   *
+   * It travels on the target because a turn's play minutes are measured from it, and the Audio
+   * _Turn is the only thing that saw it. Measuring from `audio_start` rather than from the
+   * latency record's `audio_end` is deliberate: `startTurnLatency` begins at `audio_end` because
+   * that is the interval product.md's target names, and narrowing the accrual window to it would
+   * under-count a child's play time, which is the less conservative direction.
+   */
+  readonly audioStartMs: number;
+  /**
    * The turn's Stt_Session: the one the Audio_Turn pushed this upload's frames into (Req 14.2).
    *
    * It travels on the target rather than being looked up by id, because the two ids in play are

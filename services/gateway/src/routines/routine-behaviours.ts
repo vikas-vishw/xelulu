@@ -27,11 +27,10 @@
 // cannot be inside `tiny`'s one sentence of eight words and still be useful at `maker`. The
 // tests measure every one of them with `checkOutput` at the stage it was written for.
 //
-// WHAT IS HERE AND WHAT IS NOT. This module holds the Grandma playback and the three call
-// behaviours, which are what the Grandma wave needs: the playback narration is also the function
-// the Grandma_Store's write-time title gate runs (Req 7.7a), so it has to be the same one
-// playback speaks. The routine, nap and charge-reminder behaviours join the table with the
-// Routine_Scheduler that fires them.
+// WHAT IS HERE. The six routine behaviours, the Nap_Sequence, the two charge reminders, the
+// Grandma playback and the three call behaviours: every behaviour this phase can fire, in one
+// table. The playback narration is also the function the Grandma_Store's write-time title gate
+// runs (Req 7.7a), so it has to be the same one playback speaks.
 import {
   type AgeStage,
   type CmdAction,
@@ -41,15 +40,41 @@ import {
 } from "@xelulu/shared";
 
 import { wordCount } from "../brain/safety/age-shape.js";
+import { morningGreeting, wordNarration } from "../brain/story/word-of-the-day.js";
 
 /** The behaviours this phase can fire. Extended, never renumbered. */
 export const ROUTINE_BEHAVIOUR_IDS = Object.freeze([
+  "morning",
+  "brushing",
+  "meals",
+  "play_time",
+  "wind_down",
+  "bedtime",
+  "nap",
+  "battery_20",
+  "battery_10",
   "grandma_play",
   "call_ring",
   "call_announce",
   "call_end",
 ] as const);
 export type RoutineBehaviourId = (typeof ROUTINE_BEHAVIOUR_IDS)[number];
+
+/**
+ * The behaviours whose `say` reads a fixed template from the table below. `morning` is NOT one of
+ * them: its narration is the Word_Of_The_Day's, or the Requirement 5.4b greeting when the day's
+ * word is not available to this child — and the Grandma playback and the call announce build
+ * theirs from their own functions.
+ */
+type NarratedBehaviourId =
+  | "brushing"
+  | "meals"
+  | "play_time"
+  | "wind_down"
+  | "bedtime"
+  | "nap"
+  | "battery_20"
+  | "battery_10";
 
 export type BehaviourAction = Readonly<{
   /**
@@ -136,6 +161,14 @@ export const LED_RING = Object.freeze({
   brightness: 40,
 } as const);
 
+/** A warm `solid` for a routine that is not about sleep. */
+export const LED_WARM = Object.freeze({
+  target: "cheeks",
+  color: "#FFB36A",
+  effect: "solid",
+  brightness: 35,
+} as const);
+
 // ---------------------------------------------------------------------------------------------
 // The narrations
 
@@ -186,6 +219,147 @@ export const TITLE_NAMING_STAGES: readonly AgeStage[] = Object.freeze([
   "maker",
 ]);
 
+/**
+ * The fixed narration of every templated behaviour, per language AND per Age_Stage (Req 10.8,
+ * 11.5, 13.3). One string cannot be inside `tiny`'s one sentence of eight words and still be
+ * useful at `maker`, so each cell is written for the stage it is spoken at, and the tests measure
+ * every one of the sixty-four with `checkOutput` at exactly that stage.
+ *
+ * None of them names a number, a brand, a price or a URL, and none uses a word on the
+ * Output_Guard's romantic, frightening, medical, legal or financial lists — so the robot asks for
+ * a charge rather than saying it is ill, and bedtime is a hum rather than a nightmare.
+ */
+const BEHAVIOUR_NARRATIONS: Readonly<
+  Record<NarratedBehaviourId, Readonly<Record<SupportedLang, Readonly<Record<AgeStage, string>>>>>
+> = Object.freeze({
+  brushing: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "Time to brush your teeth.",
+      little: "Time to brush your teeth. Shall we do it together?",
+      explorer: "Time to brush your teeth. Up and down, then round and round. Shall we start?",
+      maker:
+        "Time to brush your teeth. Up and down, then round and round, top and bottom. Can you finish before I stop humming?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "दाँत साफ़ करने का समय है।",
+      little: "दाँत साफ़ करने का समय है। चलो साथ करें?",
+      explorer: "दाँत साफ़ करने का समय है। ऊपर नीचे, फिर गोल गोल। चलो शुरू करें?",
+      maker:
+        "दाँत साफ़ करने का समय है। ऊपर नीचे, फिर गोल गोल, ऊपर और नीचे। मेरे गुनगुनाने तक पूरा कर पाओगे?",
+    }),
+  }),
+  meals: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "It is time to eat.",
+      little: "It is time to eat. Shall we wash our hands first?",
+      explorer: "It is time to eat. Let us wash our hands first. What is on your plate today?",
+      maker:
+        "It is time to eat. Let us wash our hands first. Tell me one thing on your plate that grew in the ground.",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "खाने का समय है।",
+      little: "खाने का समय है। पहले हाथ धो लें?",
+      explorer: "खाने का समय है। पहले हाथ धो लें। आज थाली में क्या है?",
+      maker: "खाने का समय है। पहले हाथ धो लें। मुझे थाली की एक चीज़ बताओ जो ज़मीन में उगी हो।",
+    }),
+  }),
+  play_time: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "It is play time now.",
+      little: "It is play time now. What shall we play?",
+      explorer: "It is play time now. We can dance or hunt for colours. What shall we play first?",
+      maker:
+        "It is play time now. We can dance, hunt for colours or make up a new game. What shall we try first?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "खेलने का समय है।",
+      little: "खेलने का समय है। क्या खेलें?",
+      explorer: "खेलने का समय है। हम नाच सकते हैं या रंग खोज सकते हैं। पहले क्या खेलें?",
+      maker:
+        "खेलने का समय है। हम नाच सकते हैं, रंग खोज सकते हैं या नया खेल बना सकते हैं। पहले क्या करें?",
+    }),
+  }),
+  wind_down: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "It is quiet time now.",
+      little: "It is quiet time now. Shall we breathe slowly together?",
+      explorer:
+        "It is quiet time now. Let us breathe slowly together. Shall the toys go in their basket?",
+      maker:
+        "It is quiet time now. Let us breathe slowly together. Shall we put the toys away and pick one calm story?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "शांत समय है।",
+      little: "शांत समय है। चलो धीरे धीरे साँस लें?",
+      explorer: "शांत समय है। चलो धीरे धीरे साँस लें। खिलौने टोकरी में रख दें?",
+      maker: "शांत समय है। चलो धीरे धीरे साँस लें। खिलौने रख दें और एक शांत कहानी चुनें?",
+    }),
+  }),
+  bedtime: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "It is bedtime now.",
+      little: "It is bedtime now. Shall I hum a soft tune?",
+      explorer: "It is bedtime now. I will hum a soft tune. Close your eyes and listen?",
+      maker:
+        "It is bedtime now. I will hum a soft tune while you settle. Close your eyes and tell me one happy thing from today?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "सोने का समय है।",
+      little: "सोने का समय है। एक धीमी धुन गुनगुनाऊँ?",
+      explorer: "सोने का समय है। मैं एक धीमी धुन गुनगुनाऊँगा। आँखें बंद करके सुनोगे?",
+      maker:
+        "सोने का समय है। मैं एक धीमी धुन गुनगुनाऊँगा। आँखें बंद करो और आज की एक अच्छी बात बताओ?",
+    }),
+  }),
+  nap: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "Let us rest now.",
+      little: "Let us rest now. I will be here when you wake.",
+      explorer: "Let us rest now. Play time is over for today. I will be here when you wake.",
+      maker:
+        "Let us rest now. Play time is over for today. I will be right here when you want to play again.",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "अब आराम करें।",
+      little: "अब आराम करें। मैं यहीं रहूँगा।",
+      explorer: "अब आराम करें। आज का खेल पूरा हुआ। मैं यहीं रहूँगा।",
+      maker: "अब आराम करें। आज का खेल पूरा हुआ। जब फिर खेलना हो, मैं यहीं रहूँगा।",
+    }),
+  }),
+  battery_20: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "I need a little charge.",
+      little: "I need a little charge soon. Can you plug me in?",
+      explorer: "I need a little charge soon. My power is getting low. Can you plug me in?",
+      maker:
+        "I need a little charge soon. My power is getting low, and I would like to keep playing. Can you plug me in?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "मुझे थोड़ा चार्ज चाहिए।",
+      little: "मुझे थोड़ा चार्ज चाहिए। मुझे प्लग में लगा दोगे?",
+      explorer: "मुझे थोड़ा चार्ज चाहिए। मेरी शक्ति कम हो रही है। मुझे प्लग में लगा दोगे?",
+      maker:
+        "मुझे थोड़ा चार्ज चाहिए। मेरी शक्ति कम हो रही है और मैं खेलते रहना चाहता हूँ। मुझे प्लग में लगा दोगे?",
+    }),
+  }),
+  battery_10: Object.freeze({
+    "en-IN": Object.freeze({
+      tiny: "I am very sleepy now.",
+      little: "I am very sleepy now. Please plug me in.",
+      explorer: "I am very sleepy now. My power is almost gone. Please plug me in?",
+      maker:
+        "I am very sleepy now. My power is almost gone, so I will rest soon. Please plug me in?",
+    }),
+    "hi-IN": Object.freeze({
+      tiny: "मुझे बहुत नींद आ रही है।",
+      little: "मुझे बहुत नींद आ रही है। कृपया मुझे प्लग में लगा दो।",
+      explorer: "मुझे बहुत नींद आ रही है। मेरी शक्ति लगभग खत्म है। कृपया मुझे प्लग में लगा दो।",
+      maker:
+        "मुझे बहुत नींद आ रही है। मेरी शक्ति लगभग खत्म है, इसलिए मैं जल्दी आराम करूँगा। कृपया मुझे प्लग में लगा दो।",
+    }),
+  }),
+});
+
 /** The call announce (Req 9.5): what the robot says when a Grandma call is accepted. */
 export const CALL_ANNOUNCE_NARRATION: Readonly<
   Record<SupportedLang, Readonly<Record<AgeStage, string>>>
@@ -224,6 +398,37 @@ function ledAction(payload: Readonly<Record<string, unknown>>): BehaviourAction 
   return { action: "led", data: { ...payload }, narration: null };
 }
 
+function animateAction(expression: string, eyes: string, loop: boolean): BehaviourAction {
+  return { action: "animate", data: { expression, eyes, loop }, narration: null };
+}
+
+/**
+ * The only two gestures of the phase: `morning`'s wave and `battery_20`'s nod (C37). They exist
+ * so Requirement 12.7's movement-off case has something real to refuse for a routine AND for a
+ * charge reminder; the gate keys on the ACTION and not on the name.
+ */
+function gestureAction(name: string): BehaviourAction {
+  return { action: "gesture", data: { name }, narration: null };
+}
+
+/**
+ * `morning`'s narration IS the Word_Of_The_Day's, at every stage — no greeting precedes it,
+ * because `tiny` has room for one sentence of eight words and cannot be both (Req 5.4). A null
+ * `word` is the single signal for the Requirement 5.4b greeting, and it covers both of that
+ * case's causes: no entry carries the Child_Context's first language, or the parent has not
+ * opened the `world` category (C38). The Routine_Scheduler resolves both before it calls here.
+ */
+function morningNarration(ctx: BehaviourContext): string {
+  return ctx.word === null
+    ? morningGreeting(ctx.lang, ctx.ageStage)
+    : wordNarration(ctx.word, ctx.lang, ctx.ageStage);
+}
+
+/** The fixed template for a behaviour that has one, for this language and Age_Stage. */
+function templated(id: NarratedBehaviourId, ctx: BehaviourContext): string {
+  return BEHAVIOUR_NARRATIONS[id][ctx.lang][ctx.ageStage];
+}
+
 /**
  * The ordered actions of a behaviour, in one language, for one Age_Stage. Pure, total, and the
  * only place a behaviour's payload is written.
@@ -233,6 +438,54 @@ export function behaviourActions(
   ctx: BehaviourContext,
 ): readonly BehaviourAction[] {
   switch (id) {
+    case "morning": {
+      const narration = morningNarration(ctx);
+      return [
+        sayAction(narration, ctx.lang, "happy"),
+        animateAction("happy", ANIMATE_EYES.blink, false),
+        gestureAction("wave"),
+        ledAction(LED_WARM),
+      ];
+    }
+    case "brushing":
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "happy"),
+        animateAction("happy", ANIMATE_EYES.blink, true),
+      ];
+    case "meals":
+      return [sayAction(templated(id, ctx), ctx.lang, "happy"), ledAction(LED_WARM)];
+    case "play_time":
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "happy"),
+        animateAction("happy", ANIMATE_EYES.blink, true),
+        ledAction(LED_WARM),
+      ];
+    case "wind_down":
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "sleepy"),
+        animateAction("sleepy", ANIMATE_EYES.blink, true),
+        ledAction(LED_DIM),
+      ];
+    case "bedtime":
+    case "nap":
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "sleepy"),
+        animateAction("sleepy", ANIMATE_EYES.blink, false),
+        ledAction(LED_DIM),
+      ];
+    case "battery_20":
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "happy"),
+        // The one movement-bearing action a charge reminder carries (C37, Req 11.5).
+        gestureAction("nod"),
+        ledAction({ target: "belly", color: "#FFB36A", effect: "solid", brightness: 35 }),
+      ];
+    case "battery_10":
+      // No `gesture`: a nearly flat robot is never asked to move (Req 11.5).
+      return [
+        sayAction(templated(id, ctx), ctx.lang, "sleepy"),
+        ledAction({ target: "belly", color: "#FF8A6A", effect: "solid", brightness: 25 }),
+      ];
     case "grandma_play": {
       // A missing title would name nothing, so the title-free `tiny` wording stands in. The
       // Grandma_Store never stores a recording without a title, so this is a floor, not a path.

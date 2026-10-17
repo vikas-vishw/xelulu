@@ -20,7 +20,7 @@ import { createTestClock } from "./support/test-clock.js";
 import { createCaptureSink } from "./support/capture-sink.js";
 import { createContentStack } from "./support/content-stack.js";
 import { createGatewayLog } from "../src/log/gateway-log.js";
-import { createRoutines } from "../src/brain/tools/routines.js";
+import { createRoutineStore } from "../src/routines/routine-store.js";
 import {
   DEVICE_ACTION_ALLOWED,
   createDeviceActions,
@@ -112,7 +112,7 @@ function harness(
   const sent: CommandRequest[] = [];
   const nowMinutes = { value: 12 * 60 };
   const context = contextOf(policy, over);
-  const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
   const stack = createContentStack({ clock, log });
   const router = createToolRouter({
     log,
@@ -342,7 +342,7 @@ describe("device actions are gated before anything is sent", () => {
     const log = createGatewayLog(clock, createCaptureSink());
     const sent: CommandRequest[] = [];
     const context = contextOf({ quietHours: null, playLimitMinutes: 30, movementOn: true });
-    const routines = createRoutines(undefined, { [DEVICE]: 30 });
+    const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 30 } });
     const stack = createContentStack({ clock, log });
     const router = createToolRouter({
       log,
@@ -418,7 +418,7 @@ describe("device actions are gated before anything is sent", () => {
             movementOn: c.movementOn,
           };
           const context = contextOf(policy);
-          const routines = createRoutines(undefined, { [DEVICE]: c.used });
+          const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: c.used } });
           const device = createDeviceActions({
             sendCommand: (request) => {
               sent.push(request);
@@ -518,7 +518,8 @@ describe("an ack reason is final", () => {
     // Structural: the module takes a sender and nothing else, so no ack path exists to retry on.
     const spy = vi.fn(() => ({ ok: true, cmd_id: "cmd_1" }) as CommandResult);
     const context = contextOf(OPEN_POLICY);
-    const routines = createRoutines(undefined, { [DEVICE]: 0 });
+    const clock = createTestClock(0);
+    const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
     const device = createDeviceActions({
       sendCommand: spy,
       context,

@@ -28,16 +28,24 @@ import type { LlmProvider } from "./brain/providers/llm-provider.js";
 import type { SttProvider } from "./brain/providers/stt-provider.js";
 import type { TtsProvider } from "./brain/providers/tts-provider.js";
 import { createStorySessions } from "./brain/story/story-session.js";
+import { localMinutes } from "./brain/story/word-of-the-day.js";
 import { createContentLibrary } from "./brain/tools/content-library.js";
 import { createDeviceActions } from "./brain/tools/device-action.js";
-import { createRoutines } from "./brain/tools/routines.js";
 import { createToolRouter } from "./brain/tools/tool-router.js";
+import { createChargeReminders } from "./routines/charge-reminders.js";
+import { createPlayTime } from "./routines/play-time.js";
+import { createRoutineScheduler } from "./routines/routine-scheduler.js";
+import { createRoutineStore } from "./routines/routine-store.js";
+import { createActivityStore } from "./reports/activity-store.js";
 import { createVoiceBrain } from "./brain/voice-brain.js";
 import type { Clock } from "./clock.js";
 import type { GatewayConfig } from "./config.js";
 import { createContentStore } from "./content/content-store.js";
 import { createDeadlines } from "./deadlines.js";
 import { createDedupeStore } from "./devices/dedupe-store.js";
+import { createConsentStore } from "./grandma/consent-store.js";
+import { createGrandmaStore } from "./grandma/grandma-store.js";
+import { grandmaPlaybackNarration } from "./routines/routine-behaviours.js";
 import { createPresence, presenceDeadlineKey, type HeartbeatCause } from "./devices/presence.js";
 import { createRegistry } from "./devices/registry.js";
 import type { IdSource } from "./ids.js";
@@ -243,6 +251,9 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
       }
       case "status":
         heartbeat(d.deviceId, "status");
+        // The charge reminder reads the battery only from an accepted `status`, after the
+        // Child_Context update above so a reminder is gated against the right child (Req 11.1).
+        scheduler.onStatus(d.deviceId, d.message.battery_pct, d.message.charging);
         return;
       case "event": {
         const entry = dedupe.process(d.deviceId, d.message, clock.now());
@@ -285,7 +296,12 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   const transcripts = createTranscriptStore({ clock, deadlines, log });
   const alerts = createAlerts({ clock, ids, log });
   const memory = createMemoryStore();
-  const routines = createRoutines();
+  // One Routine_Store serves `routine_lookup`, the Device_Policy_Gate's `playMinutesUsed` read
+  // and the Routine_Scheduler, seeded from the Starter_Content's six templates — the one source
+  // of truth for the six routine times (Phase 4 Req 10.1a).
+  const routines = createRoutineStore({ clock });
+  /** The Word_Of_The_Day entries, shared by the turn path and the morning routine (C10). */
+  const words = createStarterWords();
   // The curated library (Phase 4 C1): seeded from the Starter_Content, gated on the way in, and
   // in memory only — it writes no file, opens no socket and is gone on restart.
   //
@@ -310,23 +326,63 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     seed: createStarterContent(),
   });
   const stories = createStorySessions({ clock, log, content });
+  // The ONE policy gate (C16, safety.md §5). Every Phase 4 behaviour — routines, charge
+  // reminders, the nap, Grandma playback and the Grandma call — goes through this object, and
+  // nothing in `src/routines/` or `src/grandma/` calls `sendCommand`.
+  const deviceActions = createDeviceActions({
+    sendCommand: sender.sendCommand,
+    context: childContext,
+    routines,
+    // Local minutes past midnight, from the one Clock and the one notion of "local".
+    nowMinutes: () => localMinutes(clock.now()),
+  });
   const tools = createToolRouter({
     log,
-    content: createContentLibrary({ content, words: createStarterWords(), clock }),
+    content: createContentLibrary({ content, words, clock }),
     stories,
     routines,
     memory,
     context: childContext,
-    device: createDeviceActions({
-      sendCommand: sender.sendCommand,
-      context: childContext,
-      routines,
-      // Local minutes past midnight, from the one Clock.
-      nowMinutes: () => {
-        const d = new Date(clock.now());
-        return d.getHours() * 60 + d.getMinutes();
-      },
-    }),
+    device: deviceActions,
+  });
+  // Routines, reminders, the Grandma schedules and the play ledger. The pair below is bound in
+  // one direction each: `createPlayTime` takes `fireNap` from the scheduler, and the scheduler
+  // takes `accruePlay` from it, so neither module imports the other's factory (Req 13.5a).
+  const activity = createActivityStore({ ids });
+  const consent = createConsentStore({ clock, ids });
+  const grandma = createGrandmaStore({
+    clock,
+    ids,
+    log,
+    consent,
+    narration: grandmaPlaybackNarration,
+  });
+  const playTime = createPlayTime({
+    clock,
+    routines,
+    context: childContext,
+    activity,
+    fireNap: (deviceId) => scheduler.fireNap(deviceId),
+  });
+  const scheduler = createRoutineScheduler({
+    clock,
+    deadlines,
+    log,
+    actions: deviceActions,
+    context: childContext,
+    routines,
+    grandma,
+    reminders: createChargeReminders(),
+    activity,
+    play: playTime,
+    words,
+    // Scheduler_Devices (Req 10.13). The `Registry` holds per-device predicates only and
+    // `createRegistry` takes exactly one device, so the list is a composition-root concern and
+    // the interface gains no enumeration member. Called on every tick, never cached.
+    devices: () =>
+      registry.isRegistered(config.device.deviceId) && registry.helloSeen(config.device.deviceId)
+        ? [config.device.deviceId]
+        : [],
   });
 
   // The Filler is synthesised at start(); until then there is none, which only means a slow turn
@@ -516,6 +572,9 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
         }
       }
 
+      // The minute tick starts with the broker session, so a routine can only fire once the
+      // gateway is actually up (Req 10.3).
+      scheduler.start();
       session.start();
     },
 
@@ -530,6 +589,7 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
       responder.stop();
       transcripts.stop();
       tracker.stop();
+      scheduler.stop();
       for (const id of deviceIds) deadlines.cancel(presenceDeadlineKey(id));
       await session.stop();
       // Every open stream ends before its listener closes (Phase 1.3 Req 1.9).

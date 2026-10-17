@@ -89,6 +89,8 @@ export function createAudioTurn(deps: AudioTurnDeps): AudioTurn {
   const idleKey = `${deps.key}:idle`;
   let stage: TurnStage = "awaiting_start";
   let turnId: string | null = null;
+  /** The Clock instant the accepted `audio_start` was handled (Phase 4 C35). Read nowhere else. */
+  let audioStartMs = 0;
   let framesIn = 0;
   let bytesIn = 0;
   let framesOut = 0;
@@ -181,6 +183,7 @@ export function createAudioTurn(deps: AudioTurnDeps): AudioTurn {
     return {
       deviceId,
       turnId: id,
+      audioStartMs,
       // The session this turn's frames went into, handed over rather than looked up by id: the
       // responder has no way to reach it otherwise, because it was opened under the socket's key
       // before this turn_id existed.
@@ -249,6 +252,7 @@ export function createAudioTurn(deps: AudioTurnDeps): AudioTurn {
       }
       turnId = message.turn_id;
       stage = "uploading";
+      audioStartMs = clock.now();
       deadlines.cancel(startKey);
       armIdle();
       messageIn("audio_start");

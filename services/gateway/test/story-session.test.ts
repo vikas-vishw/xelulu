@@ -45,7 +45,7 @@ import {
   type ChildContext,
   type ChildContextTable,
 } from "../src/brain/state/child-context.js";
-import { createRoutines } from "../src/brain/tools/routines.js";
+import { createRoutineStore } from "../src/routines/routine-store.js";
 import { createDeviceActions } from "../src/brain/tools/device-action.js";
 import {
   STORY_START_TOOL_TEXT,
@@ -135,7 +135,7 @@ function harness(over: Partial<ChildContext> = {}): Harness {
     forDevice: () => context,
     childKeyFor: () => "child:test",
   };
-  const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
   const stack = createContentStack({ clock, log });
   const router = createToolRouter({
     log,
@@ -347,7 +347,7 @@ describe("the Tool_Router opens the session and the library only resolves", () =
       forDevice: () => h.context,
       childKeyFor: () => "child:test",
     };
-    const routines = createRoutines(undefined, { [DEVICE]: 0 });
+    const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
     const empty: ContentItem = {
       ...seeded(LINEAR),
       content_id: "story_empty_first_step",

@@ -20,7 +20,7 @@ import { createGatewayLog, type GatewayLog } from "../src/log/gateway-log.js";
 import { createDeadlines, type Deadlines } from "../src/deadlines.js";
 import { randomIds } from "../src/ids.js";
 import { checkOutput } from "../src/brain/safety/output-guard.js";
-import { createRoutines } from "../src/brain/tools/routines.js";
+import { createRoutineStore } from "../src/routines/routine-store.js";
 import { createDeviceActions } from "../src/brain/tools/device-action.js";
 import {
   MOST_RESTRICTIVE_CONTEXT,
@@ -98,7 +98,7 @@ function harness(
   const deadlines = createDeadlines(clock);
   const sent: CommandRequest[] = [];
   const context = contextOf(policy, over);
-  const routines = createRoutines(undefined, { [DEVICE]: 0 });
+  const routines = createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } });
   const calls = createGrandmaCalls({
     clock,
     deadlines,
@@ -304,7 +304,7 @@ describe("the behaviours through the Device_Policy_Gate (Req 9.3, 9.5, 9.6)", ()
           return { ok: true, cmd_id: "cmd_1" };
         },
         context,
-        routines: createRoutines(undefined, { [DEVICE]: 0 }),
+        routines: createRoutineStore({ clock, playMinutes: { [DEVICE]: 0 } }),
         nowMinutes: () => 12 * 60,
       }),
       context,

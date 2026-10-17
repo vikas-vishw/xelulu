@@ -41,6 +41,16 @@ export function localDayKey(nowMs: number): string {
 }
 
 /**
+ * Local minutes past midnight for a Clock time: what a schedule's `HH:MM` is compared against,
+ * and what the Device_Policy_Gate's quiet-hours window is read in. Here beside the day key and
+ * the day index so there is ONE notion of "local" in the Gateway and not three.
+ */
+export function localMinutes(nowMs: number): number {
+  const d = new Date(nowMs);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/**
  * The day's entry for one language, or null (Req 5.5). The day's INDEX is the same for every
  * child and every language; the walk forward from it — wrapping once — finds the first entry that
  * carries `lang`, because a `WordEntry` holds one language and a Hindi word of the day is not the
