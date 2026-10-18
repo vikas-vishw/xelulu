@@ -53,6 +53,17 @@ const COVERED_LISTS = [
   "DEVICE_SESSION_STATES",
 ] as const;
 
+/**
+ * Whether the guide names `member` in its own right, rather than only inside a longer wire value
+ * or an English word. `tap` inside `double_tap`, `turn` inside `audio_turn`, `stop` inside
+ * `stop_audio` and `play` inside `play_limit` all have to fail this, or a member the guide never
+ * covers could pass on another member's prose.
+ */
+function namesMember(member: string): boolean {
+  const escaped = member.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(guide);
+}
+
 /** The members of one exported list, or null when the export is not a list of strings. */
 function listMembers(name: string): readonly string[] | null {
   const value: unknown = (shared as Record<string, unknown>)[name];
@@ -79,7 +90,10 @@ describe("the Intern_Guide covers the contract (Req 6.6)", () => {
     const members = listMembers(name);
     // Non-vacuity: the export really is a non-empty list of strings in the built package.
     expect(members, `${name} must be a non-empty string list in @xelulu/shared`).not.toBeNull();
-    const missing = (members ?? []).filter((member) => !guide.includes(member));
+    // Non-vacuity per member: an empty member would be found in any text at all.
+    const empty = (members ?? []).filter((member) => member.length === 0);
+    expect(empty, `${name} must hold no empty member`).toEqual([]);
+    const missing = (members ?? []).filter((member) => !namesMember(member));
     expect(missing, `${GUIDE_PATH} does not name ${name} members: ${missing.join(", ")}`).toEqual(
       [],
     );

@@ -49,7 +49,7 @@ docker compose ps
 ```
 
 Three containers reach `Up (healthy)`: EMQX, the gateway and the simulator. Allow up to a minute —
-the healthcheck interval is 10 s.
+the healthcheck interval is 10 s for the gateway and the simulator, 5 s for EMQX.
 
 **No `.env` is needed.** `docker-compose.yml` carries a local default for every value the gateway
 and simulator read. A root `.env` still wins if you make one; see the README's "Gateway and
