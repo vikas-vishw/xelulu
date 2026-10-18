@@ -12,3 +12,6 @@ apps/parent-app/expo-env.d.ts
 /.tools/
 
 .tools/
+
+# Agent/workflow bookkeeping: progress and review notes, never product source.
+/.agents/
