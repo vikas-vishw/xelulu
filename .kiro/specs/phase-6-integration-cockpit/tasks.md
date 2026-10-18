@@ -26,14 +26,14 @@ Baseline that must not regress: `corepack pnpm test` = 119 Vitest files / 2,452 
   - [x] 2.6 Extend `services/gateway/test/device-summary.test.ts` with the four fields and their nulls — _Req 2.5_
   - [x] 2.7 Full check (`build`, `lint`, `format:check`, `test`), then commit and push Wave 1 — _Req 8.7_
 
-- [ ] 3. Checkpoint — all tests pass; surface any FLAG before continuing
+- [x] 3. Checkpoint — all tests pass; surface any FLAG before continuing
 
-- [ ] 4. Wave 2 — Devices tab
-  - [ ] 4.1 Add `apps/admin/src/devices/zone-activity.ts` (pure: entries → per-zone last touch, zones from `TOUCH_ZONES`) — _Req 3.3_
-  - [ ] 4.2 Add `apps/admin/src/pages/devices-page.tsx` with every cell of Req 3.2 and 3.3; text-only states, no animation — _Req 3.2–3.5_
-  - [ ] 4.3 Add the page to `routing/use-hash-page.ts` and `app.tsx`; existing pages unchanged — _Req 3.1_
-  - [ ] 4.4 Write `apps/admin/test/devices-page.test.tsx` (RTL + fake EventSource): the row with session, pairing code and a zone cell; a session change; offline clearing in-turn; nothing secret rendered — _Req 3.5, 8.5_
-  - [ ] 4.5 Browser walkthrough, then commit and push Wave 2: device appears paired with a code, a touch on each zone lands, offline shows — screenshots recorded — _Req 3.4, 8.8_
+- [x] 4. Wave 2 — Devices tab
+  - [x] 4.1 Add `apps/admin/src/devices/zone-activity.ts` (pure: entries → per-zone last touch, zones from `TOUCH_ZONES`) — _Req 3.3_
+  - [x] 4.2 Add `apps/admin/src/pages/devices-page.tsx` with every cell of Req 3.2 and 3.3; text-only states, no animation — _Req 3.2–3.5_
+  - [x] 4.3 Add the page to `routing/use-hash-page.ts` and `app.tsx`; existing pages unchanged — _Req 3.1_
+  - [x] 4.4 Write `apps/admin/test/devices-page.test.tsx` (RTL + fake EventSource): the row with session, pairing code and a zone cell; a session change; offline clearing in-turn; nothing secret rendered — _Req 3.5, 8.5_
+  - [x] 4.5 Browser walkthrough, then commit and push Wave 2: device appears paired with a code, a touch on each zone lands, offline shows — screenshots recorded — _Req 3.4, 8.8_
 
 - [ ] 5. Wave 3 — Test Matrix
   - [ ] 5.1 Add `apps/admin/src/matrix/test-matrix.ts`: `buildMatrix(lists?)` over the three contract lists plus `FIXED_ROWS`; `expectRefusal` from an exhaustive `Record<CmdAction, boolean>`; no wire value as a literal — _Req 4.1, 4.2, 4.3, 4.6, 7.10_

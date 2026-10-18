@@ -222,6 +222,28 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Devices page (Phase 6): the session table is wide, the zone table is narrow, and the note
+   explaining presence vs session sits in the same dashed box the other notes use. */
+
+.devices-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.zone-table {
+  width: auto;
+  min-width: 18rem;
+}
+
+.devices-note {
+  padding: 0.75rem;
+  border: 1px dashed var(--xl-border);
+  border-radius: 0.25rem;
+}
+
+.devices-note code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
 .device-list-empty,
 .live-log-empty {
   padding: 0.75rem;

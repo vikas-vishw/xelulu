@@ -6,6 +6,7 @@
 import { ContentPage } from "./pages/content-page";
 import { ConversationPage } from "./pages/conversation-page";
 import { DashboardPage } from "./pages/dashboard-page";
+import { DevicesPage } from "./pages/devices-page";
 import { LiveLogPage } from "./pages/live-log-page";
 import type { ContentClient } from "./content/content-client";
 import { PAGE_HASHES, useHashPage } from "./routing/use-hash-page";
@@ -23,6 +24,7 @@ export type AppProps = Readonly<{
 
 const NAV_ITEMS: readonly Readonly<{ page: ConsolePage; label: string }>[] = [
   { page: "dashboard", label: "Dashboard" },
+  { page: "devices", label: "Devices" },
   { page: "live", label: "Devices and live log" },
   { page: "conversation", label: "Conversation" },
   { page: "content", label: "Content and AI" },
@@ -54,7 +56,9 @@ export function App({ createSource = browserEventSource, contentClient }: AppPro
           </ul>
         </nav>
         <main className="console-main">
-          {page === "live" ? (
+          {page === "devices" ? (
+            <DevicesPage devices={state.devices} entries={state.entries} />
+          ) : page === "live" ? (
             <LiveLogPage devices={state.devices} entries={state.entries} />
           ) : page === "conversation" ? (
             <ConversationPage turns={state.turns} />
