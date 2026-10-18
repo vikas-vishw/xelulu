@@ -208,6 +208,7 @@ Known limits of this phase, all of them in-memory:
 
 ## Notes
 
+- Bringing up real hardware: [`docs/intern-integration-guide.md`](docs/intern-integration-guide.md) takes a hardware engineer from a clean checkout to a green test matrix in the console, with the firmware-to-Document-B conformance checklist.
 - The admin console (`apps/admin`) is internal only. It is never shipped to consumers, and its dev server listens on localhost only.
 - The EMQX default dashboard credentials are for local development only. See the [EMQX docs](https://docs.emqx.com/) for them. EMQX ports 1883, 8883, 8083, 8084 and 18083 are bound to `127.0.0.1` only. If one is busy, Compose fails with a bind error.
 - `packages/shared/src/gateway-contract/` holds the Document B v2 contract (`proto_ver` 2): types, Zod schemas, codecs and golden fixtures copied from `docs/B-gateway-and-hardware-seam.docx`.

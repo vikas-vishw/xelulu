@@ -159,6 +159,18 @@ describe("root README (Req 14)", () => {
     });
   });
 
+  // Phase 6 Req 6.6: the Intern_Guide is linked from the README in one line.
+  describe("intern integration guide (Phase 6 Req 6.6)", () => {
+    const GUIDE_PATH = "docs/intern-integration-guide.md";
+
+    it("links the guide, and the guide exists", () => {
+      const line = readme.split("\n").find((l) => l.includes(GUIDE_PATH));
+      expect(line, `README has no link to ${GUIDE_PATH}`).toBeDefined();
+      expect(line).toContain(`](${GUIDE_PATH})`);
+      expect(() => readFileSync(resolve(ROOT, GUIDE_PATH), "utf8")).not.toThrow();
+    });
+  });
+
   describe("gateway contract note (Phase 1 Req 17.6, 17.8)", () => {
     it("says the contract folder holds Document B v2 at proto_ver 2, copied from the docx", () => {
       const line = readme
