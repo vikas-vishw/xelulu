@@ -21,8 +21,10 @@ services:
   # 127.0.0.1 only: the gateway's Operator_Surface and the simulator's Control_Surface. The
   # command is each image's CMD plus the argument that binds that surface on all container
   # interfaces (Local_Mode only). The gateway also takes the Transcripts_Argument, so this local
-  # stack shows transcript and reply text on the operator channel, and the Content_Admin_Argument,
-  # so the console's Content page may write; both have effect in Local_Mode only. The CLIs are
+  # stack shows transcript and reply text on the operator channel, the Content_Admin_Argument, so
+  # the console's Content page may write, and the Device_Control_Argument, so the console's Device
+  # Control page and the Test_Matrix's driven rows may fire the five allow-listed commands through
+  # the Device_Action_Gate; all three have effect in Local_Mode only. The CLIs are
   # still driven with `docker compose exec`.
   #
   # Each service's `environment:` carries its own eight G3 keys with Local_Mode defaults, so
@@ -49,6 +51,7 @@ services:
         "--listen-all-interfaces",
         "--operator-transcripts",
         "--content-admin",
+        "--device-control",
       ]
     environment:
       APP_ENV: "${APP_ENV:-local}"

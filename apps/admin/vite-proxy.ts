@@ -57,9 +57,27 @@ export const READ_PROXY_KEYS: readonly string[] = [
 /** The eight writes: forwarded only in content-admin mode (Req 18.2). */
 export const WRITE_PROXY_KEYS: readonly string[] = CONTENT_WRITE_PATHS.map(proxyKey);
 
+/** The dev-server mode that opens the console's command path (Phase 6 C11, Req 5.8). */
+export const DEVICE_CONTROL_MODE = "device-control";
+
+/**
+ * The one Device_Control_Route, restated here for the same reason as the content paths above.
+ * It is deliberately its OWN mode and its OWN key: editing content and firing commands at a
+ * robot are different powers, so one dev mode never grants the other.
+ */
+const DEVICE_CONTROL_PATHS: readonly string[] = ["/v1/device-control"];
+
+/** The command path: forwarded only in device-control mode (Req 5.8). */
+export const DEVICE_CONTROL_PROXY_KEYS: readonly string[] = DEVICE_CONTROL_PATHS.map(proxyKey);
+
 /** True only for the content-admin dev mode. `mode` is Vite's, never an env value (Req 18.5). */
 export function contentAdminMode(mode: string): boolean {
   return mode === CONTENT_ADMIN_MODE;
+}
+
+/** True only for the device-control dev mode. `mode` is Vite's, never an env value (Req 5.8). */
+export function deviceControlMode(mode: string): boolean {
+  return mode === DEVICE_CONTROL_MODE;
 }
 
 // Built from parts so no scheme-prefixed literal appears in source.
@@ -91,7 +109,7 @@ function refuseForeignOrigin(req: IncomingMessage): false | undefined {
 
 /**
  * One entry, built once so the three safety behaviours — the loopback target, the foreign-`Origin`
- * refusal and the stripped `origin` header — exist in exactly one place for all thirteen keys.
+ * refusal and the stripped `origin` header — exist in exactly one place for every key.
  */
 function entry(port: number): ProxyOptions {
   return {
@@ -110,17 +128,21 @@ function entry(port: number): ProxyOptions {
 
 /**
  * null when rawPort is not an integer 1–65535 (Req 4.3). The read keys are forwarded in every
- * mode; the eight write keys only with `contentAdmin`, which arrives as an argument from Vite's
- * mode and never from the environment (Req 18.2, 18.5).
+ * mode; the eight write keys only with `contentAdmin` and the one command key only with
+ * `deviceControl`, each arriving as an argument from Vite's mode and never from the environment
+ * (Req 18.2, 18.5; Phase 6 Req 5.8).
  */
 export function operatorProxy(
   rawPort: string | undefined,
-  opts: Readonly<{ contentAdmin?: boolean }> = {},
+  opts: Readonly<{ contentAdmin?: boolean; deviceControl?: boolean }> = {},
 ): Record<string, ProxyOptions> | null {
   const port = parsePort(rawPort);
   if (port === null) return null;
 
-  const keys =
-    opts.contentAdmin === true ? [...READ_PROXY_KEYS, ...WRITE_PROXY_KEYS] : READ_PROXY_KEYS;
+  const keys = [
+    ...READ_PROXY_KEYS,
+    ...(opts.contentAdmin === true ? WRITE_PROXY_KEYS : []),
+    ...(opts.deviceControl === true ? DEVICE_CONTROL_PROXY_KEYS : []),
+  ];
   return Object.fromEntries(keys.map((key) => [key, entry(port)]));
 }

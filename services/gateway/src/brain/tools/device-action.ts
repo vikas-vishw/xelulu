@@ -16,7 +16,7 @@
 //    replacement command, and no reason string is ever put into text a child could hear.
 import { CMD_ACTIONS, type CmdAction, type PolicyRefusal } from "@xelulu/shared";
 
-import type { CommandRequest, CommandResult } from "../../mqtt/command-sender.js";
+import type { CommandError, CommandRequest, CommandResult } from "../../mqtt/command-sender.js";
 import type { ChildContextTable, DevicePolicy } from "../state/child-context.js";
 import type { Routines } from "./routines.js";
 import type { ToolResult } from "./tool-router.js";
@@ -61,9 +61,26 @@ export type DeviceActionRequest = Readonly<{ action: CmdAction; data: Record<str
  */
 export type { PolicyRefusal };
 
+/**
+ * What one send answered (Phase 6 C12): the `cmd_id` the sender minted, the gate's Policy_Refusal,
+ * or the sender's own Command_Error. Three outcomes and no fourth, so no caller can read a refused
+ * request as anything but refused.
+ */
+export type DeviceActionSend =
+  | { readonly ok: true; readonly cmd_id: string }
+  | { readonly ok: false; readonly refusal: PolicyRefusal }
+  | { readonly ok: false; readonly error: CommandError };
+
 export interface DeviceActions {
   /** Denied with `policy` under quiet hours, a reached play limit, or movement off. */
   request(deviceId: string, req: DeviceActionRequest): ToolResult;
+  /**
+   * ONE GATE, ONE SEND (Phase 6 C12). The gate runs first and a refusal puts nothing on the wire;
+   * `request` is this method plus a mapping onto `ToolResult`, so policy is checked in exactly one
+   * place whether the caller is a model's tool call or the operator's Device_Control_Route. It
+   * registers no ack callback and never retries: an ack `reason` is final.
+   */
+  send(deviceId: string, req: DeviceActionRequest): DeviceActionSend;
   /** The refusal the policy would give now, or null. Exposed so tests can read the gate alone. */
   policyRefusal(deviceId: string, action: CmdAction): PolicyRefusal | null;
 }
@@ -116,23 +133,33 @@ export function createDeviceActions(
     return null;
   }
 
+  function send(deviceId: string, req: DeviceActionRequest): DeviceActionSend {
+    // The gate runs before the sender, so a refused request puts nothing on the wire.
+    const refusal = policyRefusal(deviceId, req.action);
+    if (refusal !== null) return { ok: false, refusal };
+    // Sent exactly once. No ack callback, no retry: an ack `reason` is the hardware's truth
+    // and the Phase 1.2 tracker records it (Req 9.6, safety.md §5).
+    const result = deps.sendCommand({
+      device_id: deviceId,
+      action: req.action,
+      data: req.data,
+    });
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: true, cmd_id: result.cmd_id };
+  }
+
   return {
     policyRefusal,
+    send,
 
     request(deviceId, req) {
-      // The gate runs before the sender, so a refused request puts nothing on the wire.
-      if (policyRefusal(deviceId, req.action) !== null) {
-        return { ok: false, tool: "device_action", outcome: "denied", reason: "policy" };
-      }
-      // Sent exactly once. No ack callback, no retry: an ack `reason` is the hardware's truth
-      // and the Phase 1.2 tracker records it (Req 9.6, safety.md §5).
-      const result = deps.sendCommand({
-        device_id: deviceId,
-        action: req.action,
-        data: req.data,
-      });
-      if (!result.ok) {
-        return { ok: false, tool: "device_action", outcome: "error", reason: null };
+      const sent = send(deviceId, req);
+      if (!sent.ok) {
+        // A gate refusal is `denied` on policy; a sender failure is `error`. The refusal value
+        // itself never travels further: no reason string is ever put into text a child hears.
+        return "refusal" in sent
+          ? { ok: false, tool: "device_action", outcome: "denied", reason: "policy" }
+          : { ok: false, tool: "device_action", outcome: "error", reason: null };
       }
       // The text names the action only. No `cmd_id`, no ack reason, nothing a child would hear
       // as a machine detail.

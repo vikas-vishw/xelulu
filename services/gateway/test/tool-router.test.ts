@@ -204,6 +204,10 @@ describe("the allow-list is exact-match and runs before any handler", () => {
           count();
           return { ok: true, tool: "device_action", text: "asked Xelulu to say" };
         },
+        send: () => {
+          count();
+          return { ok: true, cmd_id: "cmd_1" };
+        },
         policyRefusal: () => null,
       },
     });
@@ -526,7 +530,9 @@ describe("an ack reason is final", () => {
       routines,
       nowMinutes: () => 12 * 60,
     });
-    expect(Object.keys(device).sort()).toEqual(["policyRefusal", "request"]);
+    // Phase 6 adds `send`, which `request` now calls: one gate, one send (C12). Still no ack
+    // path, so there is still nothing a retry could hang off.
+    expect(Object.keys(device).sort()).toEqual(["policyRefusal", "request", "send"]);
     device.request(DEVICE, { action: "say", data: {} });
     expect(spy).toHaveBeenCalledTimes(1);
   });

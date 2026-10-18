@@ -4,7 +4,13 @@
 // bound on 0.0.0.0.
 import { afterEach, describe, expect, it } from "vitest";
 
-import { LISTEN_ALL_ARGUMENT, hasListenAllArgument, localSurfaceHost } from "../src/listen-host.js";
+import {
+  DEVICE_CONTROL_ARGUMENT,
+  LISTEN_ALL_ARGUMENT,
+  deviceControlEnabled,
+  hasListenAllArgument,
+  localSurfaceHost,
+} from "../src/listen-host.js";
 import { startHarness, type Harness, type HarnessOptions } from "./support/gateway-harness.js";
 
 let running: Harness[] = [];
@@ -41,6 +47,30 @@ describe("hasListenAllArgument", () => {
     expect(hasListenAllArgument(["--listen-all"])).toBe(false);
     expect(hasListenAllArgument(["--LISTEN-ALL-INTERFACES"])).toBe(false);
     expect(hasListenAllArgument(["listen-all-interfaces"])).toBe(false);
+  });
+});
+
+describe("deviceControlEnabled (Phase 6 Req 5.2, C11)", () => {
+  it.each([
+    [true, [DEVICE_CONTROL_ARGUMENT], true],
+    [true, [], false],
+    // Outside Local_Mode the argument is ignored entirely: a hosted gateway cannot be given a
+    // command console by adding a flag to its command line.
+    [false, [DEVICE_CONTROL_ARGUMENT], false],
+    [false, [], false],
+  ] as const)("Local_Mode %s with %j gives %s", (localMode, argv, expected) => {
+    expect(deviceControlEnabled(localMode, argv)).toBe(expected);
+  });
+
+  it("matches only the exact argument, and is not the content flag", () => {
+    expect(DEVICE_CONTROL_ARGUMENT).toBe("--device-control");
+    expect(deviceControlEnabled(true, ["--other", DEVICE_CONTROL_ARGUMENT])).toBe(true);
+    expect(deviceControlEnabled(true, ["--device-control=true"])).toBe(false);
+    expect(deviceControlEnabled(true, ["--device"])).toBe(false);
+    expect(deviceControlEnabled(true, ["--DEVICE-CONTROL"])).toBe(false);
+    expect(deviceControlEnabled(true, ["device-control"])).toBe(false);
+    // Editing content and firing commands are different powers (C11).
+    expect(deviceControlEnabled(true, ["--content-admin"])).toBe(false);
   });
 });
 

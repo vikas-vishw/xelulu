@@ -117,6 +117,11 @@ export type GatewayDeps = Readonly<{
    * false, so every Operator_Content_Route write answers 403 before it reads a body byte.
    */
   contentAdmin?: boolean;
+  /**
+   * Started with the Device_Control_Argument (Phase 6 C11); counts only in Local_Mode. Default
+   * false, so the Device_Control_Route answers 403 before it reads a body byte.
+   */
+  deviceControl?: boolean;
   /** Test only: providers to use instead of the mocks. Production builds only the mocks (C7). */
   providers?: Readonly<{ stt: SttProvider; llm: LlmProvider; tts: TtsProvider }>;
   /** Phase 3B consumes this; in 3A nothing does (C4). */
@@ -680,6 +685,12 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
       daily: reportBuilder.build(config.device.deviceId, "daily"),
       weekly: reportBuilder.build(config.device.deviceId, "weekly"),
     }),
+
+    // ----- the Phase 6 Device_Control_Route (Req 5). Local_Mode AND its own argument, and
+    // nothing else. It delegates to the SAME Device_Action_Gate every Phase 4 behaviour goes
+    // through, so the operator has exactly the powers a conversation has and no more (C10, C12).
+    deviceControl: () => config.localMode && (deps.deviceControl ?? false),
+    sendDeviceAction: (deviceId, req) => deviceActions.send(deviceId, req),
   };
 
   function stoppingEntry(): GatewayLogEntryOf<"gateway"> {

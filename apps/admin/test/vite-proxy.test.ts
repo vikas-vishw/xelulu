@@ -8,12 +8,15 @@ import { describe, expect, it } from "vitest";
 import {
   CONSOLE_ORIGINS,
   CONTENT_ADMIN_MODE,
+  DEVICE_CONTROL_MODE,
+  DEVICE_CONTROL_PROXY_KEYS,
   DEV_HOST,
   DEV_PORT,
   READ_PROXY_KEYS,
   STREAM_PROXY_KEY,
   WRITE_PROXY_KEYS,
   contentAdminMode,
+  deviceControlMode,
   operatorProxy,
 } from "../vite-proxy";
 
@@ -68,6 +71,48 @@ describe("operatorProxy", () => {
       "^/v1/routines/run(\\?|$)",
     ]);
     expect(Object.keys(proxy ?? {})).toHaveLength(13);
+    // The command key is NOT one of them: content-admin mode grants no command path (Req 5.8).
+    for (const key of DEVICE_CONTROL_PROXY_KEYS) {
+      expect(Object.keys(proxy ?? {})).not.toContain(key);
+    }
+  });
+
+  it("forwards the one command path only in device-control mode", () => {
+    expect(DEVICE_CONTROL_PROXY_KEYS).toEqual(["^/v1/device-control(\\?|$)"]);
+
+    // Neither mode: the five reads only.
+    expect(Object.keys(operatorProxy("8787") ?? {})).toEqual([...READ_PROXY_KEYS]);
+
+    // Device-control mode alone: the reads plus the one command key, and no write key.
+    const device = operatorProxy("8787", { deviceControl: true });
+    expect(Object.keys(device ?? {})).toEqual([...READ_PROXY_KEYS, ...DEVICE_CONTROL_PROXY_KEYS]);
+    for (const key of WRITE_PROXY_KEYS) expect(Object.keys(device ?? {})).not.toContain(key);
+
+    // Both modes at once: fourteen keys, every existing one unchanged.
+    const both = operatorProxy("8787", { contentAdmin: true, deviceControl: true });
+    expect(Object.keys(both ?? {})).toEqual([
+      ...READ_PROXY_KEYS,
+      ...WRITE_PROXY_KEYS,
+      ...DEVICE_CONTROL_PROXY_KEYS,
+    ]);
+    expect(Object.keys(both ?? {})).toHaveLength(14);
+  });
+
+  it("keeps the Origin and origin-stripping behaviour on the command key", () => {
+    const proxy = operatorProxy("8787", { deviceControl: true });
+    const entry = proxy?.["^/v1/device-control(\\?|$)"];
+    if (entry === undefined) throw new Error("expected the command entry");
+    expect(entry.target).toBe(SCHEME + SEP + "127.0.0.1:8787");
+    expect(entry.changeOrigin).toBe(true);
+    if (entry.bypass === undefined) throw new Error("expected bypass");
+    expect(
+      entry.bypass(
+        { headers: { origin: SCHEME + SEP + "evil.example" } } as IncomingMessage,
+        undefined,
+        entry,
+      ),
+    ).toBe(false);
+    expect(entry.bypass({ headers: {} } as IncomingMessage, undefined, entry)).toBeUndefined();
   });
 
   it("recognises the content-admin mode and nothing else", () => {
@@ -76,6 +121,25 @@ describe("operatorProxy", () => {
     for (const mode of ["development", "production", "content", ""]) {
       expect(contentAdminMode(mode)).toBe(false);
     }
+    // Neither mode is the other: one dev mode never grants the other's power (Phase 6 C11).
+    expect(contentAdminMode(DEVICE_CONTROL_MODE)).toBe(false);
+  });
+
+  it("recognises the device-control mode and nothing else", () => {
+    expect(DEVICE_CONTROL_MODE).toBe("device-control");
+    expect(deviceControlMode(DEVICE_CONTROL_MODE)).toBe(true);
+    for (const mode of ["development", "production", "device", "control", ""]) {
+      expect(deviceControlMode(mode)).toBe(false);
+    }
+    expect(deviceControlMode(CONTENT_ADMIN_MODE)).toBe(false);
+  });
+
+  it("matches the command path with or without a query, and nothing else", () => {
+    const key = new RegExp("^/v1/device-control(\\?|$)");
+    expect(key.test("/v1/device-control")).toBe(true);
+    expect(key.test("/v1/device-control?x=1")).toBe(true);
+    expect(key.test("/v1/device-controls")).toBe(false);
+    expect(key.test("/v1/device-control/other")).toBe(false);
   });
 
   it("targets loopback at a valid port on every key", () => {

@@ -58,6 +58,9 @@ const deps: OperatorRouteDeps = {
   routinesSnapshot: unreachable,
   runRoutine: unreachable,
   reports: unreachable,
+  // The Phase 6 Device_Control_Route deps, equally unreachable on the stream path.
+  deviceControl: unreachable,
+  sendDeviceAction: unreachable,
 };
 
 describe("Operator_Stream routes", () => {

@@ -118,6 +118,11 @@ export type HarnessOptions = HarnessConfigOptions &
     operatorTranscripts?: boolean;
     /** Passed to `GatewayDeps.contentAdmin` (Phase 4 C23); omitted by default, so writes are off. */
     contentAdmin?: boolean;
+    /**
+     * Passed to `GatewayDeps.deviceControl` (Phase 6 C11); omitted by default, so the
+     * Device_Control_Route answers 403 before it reads a body byte.
+     */
+    deviceControl?: boolean;
   }>;
 
 export interface Harness {
@@ -229,6 +234,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
       ? {}
       : { operatorTranscripts: opts.operatorTranscripts }),
     ...(opts.contentAdmin === undefined ? {} : { contentAdmin: opts.contentAdmin }),
+    ...(opts.deviceControl === undefined ? {} : { deviceControl: opts.deviceControl }),
   });
   gateway.log.subscribe((e) => entries.push(e));
   const device = createFakeDevice({

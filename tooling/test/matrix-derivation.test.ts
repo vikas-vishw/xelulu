@@ -24,6 +24,8 @@ import { formatSourceFindings } from "../checks/service-sources.js";
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const CONSOLE_SRC = "apps/admin/src";
 const MATRIX_MODULE = "apps/admin/src/matrix/test-matrix.ts";
+/** The Device_Action_Gate, whose allow-list the console's drivable set must equal exactly. */
+const GATE_MODULE = "services/gateway/src/brain/tools/device-action.ts";
 const EXCLUDED_DIRS = new Set(["node_modules", "dist"]);
 
 /** The three Document B lists the matrix walks, by their Shared_Package export name. */
@@ -77,6 +79,29 @@ const contractLists: Record<string, readonly string[]> = Object.fromEntries(
 
 const contract: ContractSurface = { typeNames: contractNames, lists: contractLists };
 
+/**
+ * The `{ action: true | false }` entries of a frozen decision table, read off the source. Lines
+ * that are not `name: true,` or `name: false,` — the comments that explain each `false` — are
+ * ignored, so the check reads the decisions and nothing else.
+ */
+function decisionTable(source: string, name: string, where: string): Record<string, boolean> {
+  const declared = source.indexOf(`const ${name}`);
+  expect(declared, `${where} must declare ${name}`).toBeGreaterThanOrEqual(0);
+  const frozen = source.indexOf("Object.freeze(", declared);
+  expect(frozen, `${where}'s ${name} must be Object.freeze(...)`).toBeGreaterThan(declared);
+  const open = source.indexOf("{", frozen);
+  const close = source.indexOf("});", open);
+  expect(close, `${where}'s ${name} must close`).toBeGreaterThan(open);
+
+  const out: Record<string, boolean> = {};
+  for (const match of source
+    .slice(open + 1, close)
+    .matchAll(/^[ \t]*([a-z_][a-z0-9_]*)[ \t]*:[ \t]*(true|false)[ \t]*,/gm)) {
+    out[match[1] ?? ""] = match[2] === "true";
+  }
+  return out;
+}
+
 describe("the Test_Matrix is derived from the contract (Req 4.3, 8.6)", () => {
   it("builds its rows from the three Document B lists in the Shared_Package", () => {
     const source = read(MATRIX_MODULE);
@@ -123,6 +148,36 @@ describe("the Test_Matrix is derived from the contract (Req 4.3, 8.6)", () => {
       }
     }
     expect(found, `Hand-listed matrix rows:\n${found.join("\n")}`).toEqual([]);
+  });
+
+  // Phase 6, Wave 3 review: the console cannot import the Gateway's allow-list (an app may not
+  // import from a service), so each derives the same answer from its own exhaustive decision
+  // table over `CmdAction`. Nothing static tied the two together, which means a changed
+  // allow-list could have drifted silently in either direction. This reads both tables off disk
+  // and insists they are the same table.
+  it("keeps the console's drivable set identical to the Device_Action_Gate's allow-list", () => {
+    const gate = decisionTable(read(GATE_MODULE), "CONVERSATIONAL", GATE_MODULE);
+    const operator = decisionTable(read(MATRIX_MODULE), "OPERATOR_DRIVABLE", MATRIX_MODULE);
+    const actions = contractLists["CMD_ACTIONS"] ?? [];
+
+    // Non-vacuity: both tables are exhaustive over Document B's actions, so a comparison of
+    // them really is a comparison of the whole allow-list.
+    expect(actions.length).toBeGreaterThan(0);
+    expect(Object.keys(gate).sort(), `${GATE_MODULE} must decide every CMD_ACTIONS member`).toEqual(
+      [...actions].sort(),
+    );
+    expect(
+      Object.keys(operator).sort(),
+      `${MATRIX_MODULE} must decide every CMD_ACTIONS member`,
+    ).toEqual([...actions].sort());
+
+    expect(
+      operator,
+      "the console's OPERATOR_DRIVABLE has drifted from the gate's CONVERSATIONAL",
+    ).toEqual(gate);
+    // And movement is false in both, which is the entry that matters (safety.md §5).
+    expect(gate["move"]).toBe(false);
+    expect(operator["move"]).toBe(false);
   });
 
   it("breaches none of the contract-use rules anywhere in the console source", () => {

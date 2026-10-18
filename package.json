@@ -15,6 +15,7 @@
     "start:app": "pnpm --filter @xelulu/parent-app start",
     "dev:admin": "pnpm --filter @xelulu/admin dev",
     "dev:admin:content": "pnpm --filter @xelulu/admin exec vite --mode content-admin",
+    "dev:admin:device": "pnpm --filter @xelulu/admin exec vite --mode device-control",
     "start:gateway": "pnpm --silent --filter @xelulu/gateway start",
     "start:simulator": "pnpm --silent --filter @xelulu/simulator start"
   },

@@ -30,17 +30,28 @@
 //     collapsed into `invalid_fields` would leave the console unable to say what happened.
 //  3. NO response carries a transcript, a child's answer, a Media_Handle, a step text, a token or
 //     an env value (Req 16.10). Every summary is built with an explicit field list in snapshot.ts.
+//
+// Phase 6 adds ONE route, the Device_Control_Route (Req 5.1–5.6, C10, C11):
+//   POST /v1/device-control -> { ok: true, cmd_id } from the Phase 3 Device_Action_Gate
+// It is deliberately NOT `/v1/commands`. That route is the Phase 1.2 operator path, it takes any
+// Document B action, and the Compose_Acceptance_Check sends `config` through it — so gating it
+// would break a green criterion. The new route is the gated one: five allow-listed actions, quiet
+// hours, the play limit and the movement toggle, every refusal final. It is also behind its own
+// off-by-default argument, checked before a body byte is read, exactly as the content writes are.
 import {
   CONTENT_STATUSES,
   toSafeIssues,
+  type CmdAction,
   type ContentItem,
   type ContentStatus,
   type ConversationTurnView,
   type GatewayLogEntry,
+  type PolicyRefusal,
   type ReportSummary,
   type SafeIssue,
 } from "@xelulu/shared";
 
+import type { DeviceActionRequest, DeviceActionSend } from "../brain/tools/device-action.js";
 import type { GateVerdict } from "../content/content-gate.js";
 import type {
   ContentDraft,
@@ -103,6 +114,9 @@ export const OPERATOR_CONTENT_ROUTES: readonly string[] = Object.freeze([
   ...OPERATOR_CONTENT_WRITE_PATHS,
 ]);
 
+/** The one Device_Control_Route, behind the Device_Control_Argument (Phase 6 C10, Req 5.1). */
+export const OPERATOR_DEVICE_CONTROL_PATH = "/v1/device-control";
+
 export const OPERATOR_ROUTES: RouteMethods = Object.freeze({
   "/v1/devices": Object.freeze(["GET"]),
   "/v1/log": Object.freeze(["GET"]),
@@ -123,6 +137,7 @@ export const OPERATOR_ROUTES: RouteMethods = Object.freeze({
   "/v1/grandma/schedule": Object.freeze(["POST"]),
   "/v1/grandma/call": Object.freeze(["POST"]),
   "/v1/routines/run": Object.freeze(["POST"]),
+  [OPERATOR_DEVICE_CONTROL_PATH]: Object.freeze(["POST"]),
 });
 
 /** Sent with every response. */
@@ -209,6 +224,19 @@ export type OperatorRouteDeps = Readonly<{
   runRoutine: (deviceId: string, routineId: string) => RoutineRunResult;
   /** Both periods, computed on this request, with one `report_built` entry each (Req 16.9). */
   reports: () => ReportsRead;
+
+  // ----- the Phase 6 Device_Control_Route (Req 5).
+  /**
+   * Local_Mode AND the Device_Control_Argument, and nothing else (Req 5.2, C11). Read at the top
+   * of the handler, before any body byte is parsed. Deliberately separate from `contentAdmin`.
+   */
+  deviceControl: () => boolean;
+  /**
+   * The Phase 3 Device_Action_Gate's `send`, and the ONLY way this route reaches the wire
+   * (Req 5.3, C12). The gate owns the allow-list, quiet hours, the play limit and the movement
+   * toggle; the route adds no check of its own and works around no refusal.
+   */
+  sendDeviceAction: (deviceId: string, req: DeviceActionRequest) => DeviceActionSend;
 }>;
 
 /**
@@ -756,6 +784,66 @@ function routinesRun(deps: OperatorRouteDeps, req: HttpRequestIn): HttpResponseO
   return { status: 200, body: { ok: true, ...result.result } };
 }
 
+// ---------------------------------------------------------------------------------------------
+// The Phase 6 Device_Control_Route (Req 5).
+
+/** Local_Mode and the argument, checked before any body byte is parsed (Req 5.2, C11). */
+function requireDeviceControl(deps: OperatorRouteDeps): HttpResponseOut | null {
+  return deps.deviceControl() ? null : errorResponse(403, "device_control_disabled");
+}
+
+/**
+ * The Device_Action_Gate's refusal: 403 `action_refused` with the Policy_Refusal as a sibling of
+ * `error` (Req 5.3). It travels beside the code for the Phase 4 reason — `action_not_allowed`,
+ * `quiet_hours`, `play_limit` and `movement_off` mean four different things to the operator
+ * reading them, and one wire code would flatten all four. A closed enum, never a submitted value.
+ */
+function actionRefused(refusal: PolicyRefusal): HttpResponseOut {
+  const refused = errorResponse(403, "action_refused");
+  return { status: refused.status, body: { ...(refused.body as object), refusal } };
+}
+
+/**
+ * `POST /v1/device-control`. Order: the flag, then the body shape, then the gate — and the gate is
+ * the only thing that decides whether anything is sent. The route registers no ack callback and
+ * performs no retry, because an ack `reason` is final (Req 5.6).
+ */
+function deviceControl(deps: OperatorRouteDeps, req: HttpRequestIn): HttpResponseOut {
+  const disabled = requireDeviceControl(deps);
+  if (disabled !== null) return disabled;
+  const parsed = parseBody(req, COMMAND_FIELDS);
+  if (!parsed.ok) return parsed.response;
+
+  const deviceId = own(parsed.value, "device_id");
+  const action = own(parsed.value, "action");
+  const data = own(parsed.value, "data");
+  const issues: SafeIssue[] = [];
+  if (typeof deviceId !== "string") issues.push({ path: ["device_id"], kind: "invalid_type" });
+  if (typeof action !== "string") issues.push({ path: ["action"], kind: "invalid_type" });
+  if (!isPlainObject(data)) issues.push({ path: ["data"], kind: "invalid_type" });
+  if (
+    issues.length > 0 ||
+    typeof deviceId !== "string" ||
+    typeof action !== "string" ||
+    !isPlainObject(data)
+  ) {
+    return invalidFields(issues);
+  }
+
+  // The action is cast, not trusted: the gate refuses every action outside DEVICE_ACTION_ALLOWED
+  // with `action_not_allowed`, so a string Document B has never heard of reaches no further and
+  // puts nothing on the wire (Req 5.4).
+  const sent = deps.sendDeviceAction(deviceId, { action: action as CmdAction, data });
+  if (sent.ok) return { status: 200, body: { ok: true, cmd_id: sent.cmd_id } };
+  if ("refusal" in sent) return actionRefused(sent.refusal);
+  const error = sent.error;
+  return errorResponse(
+    COMMAND_ERROR_STATUS[error.code],
+    error.code,
+    error.code === "invalid_command" ? toSafeIssues(error.issues) : undefined,
+  );
+}
+
 /** The Operator_Stream takes no query: each key is refused, its value never echoed (Req 1.6). */
 export function checkStreamRequest(req: HttpRequestIn): HttpResponseOut | null {
   return noQuery(req);
@@ -812,6 +900,10 @@ export function handleOperatorRequest(
       return grandmaCall(deps, req);
     case "/v1/routines/run":
       return routinesRun(deps, req);
+    // The Phase 6 Device_Control_Route, with its own case for the same reason as above: the
+    // default branch is the ungated Phase 1.2 command handler (Req 5.1, C10).
+    case OPERATOR_DEVICE_CONTROL_PATH:
+      return deviceControl(deps, req);
     case OPERATOR_STREAM_PATH:
       // A stream needs the transport; the listener sends it to openStream, never here.
       return errorResponse(404, "unknown_route");

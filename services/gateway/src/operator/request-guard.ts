@@ -26,7 +26,13 @@ export type OperatorErrorCode =
   // existing `invalid_fields` wire code and its one body shape (Req 16.4a).
   | "content_admin_disabled"
   | "unknown_content"
-  | "invalid_transition";
+  | "invalid_transition"
+  // Phase 6 adds exactly these two, both 403 on the Device_Control_Route: the flag refusal, and
+  // the Device_Action_Gate's refusal, which carries its Policy_Refusal as a sibling of `error`
+  // because `action_not_allowed` and `quiet_hours` are different things to the operator reading
+  // them (Req 5.2, 5.3).
+  | "device_control_disabled"
+  | "action_refused";
 
 export type GuardHead = Readonly<{
   method: string;

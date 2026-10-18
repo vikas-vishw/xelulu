@@ -43,6 +43,22 @@ export function contentAdminEnabled(localMode: boolean, argv: readonly string[])
   return localMode && argv.includes(CONTENT_ADMIN_ARGUMENT);
 }
 
+/**
+ * The argument that opens the Device_Control_Route on the Operator_Surface (Phase 6 C11). Off by
+ * default, and deliberately NOT the Content_Admin_Argument: editing content and firing commands
+ * at a robot are different powers, so they are different switches.
+ */
+export const DEVICE_CONTROL_ARGUMENT = "--device-control";
+
+/**
+ * Whether the Device_Control_Route may send: Local_Mode AND the argument, and nothing else.
+ * Outside Local_Mode the argument is ignored entirely, so a hosted gateway cannot be given a
+ * command console by adding a flag to its command line.
+ */
+export function deviceControlEnabled(localMode: boolean, argv: readonly string[]): boolean {
+  return localMode && argv.includes(DEVICE_CONTROL_ARGUMENT);
+}
+
 /** 0.0.0.0 only with Local_Mode and the argument; 127.0.0.1 in every other case. */
 export function localSurfaceHost(localMode: boolean, listenAll: boolean): "127.0.0.1" | "0.0.0.0" {
   return localMode && listenAll ? "0.0.0.0" : "127.0.0.1";

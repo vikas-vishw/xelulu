@@ -45,19 +45,20 @@ Baseline that must not regress: `corepack pnpm test` = 119 Vitest files / 2,452 
 
 - [x] 6. Checkpoint — all tests pass; surface any FLAG before continuing
 
-- [ ] 7. Wave 4 — the Device_Control_Route
-  - [ ] 7.1 Extend `services/gateway/src/listen-host.ts` with `DEVICE_CONTROL_ARGUMENT` and `deviceControlEnabled`, plus its `listen-host.test.ts` cases — _Req 5.2_
-  - [ ] 7.2 Extend `services/gateway/src/brain/tools/device-action.ts` with `send()`, refactoring `request()` to call it; allow-list unchanged — _Req 5.3, 5.4, 5.6, 7.8_
-  - [ ] 7.3 Add the route: `request-guard.ts` gains `device_control_disabled` and `action_refused`; `operator-routes.ts` gains the POST route, its two deps and the handler; `/v1/commands` untouched — _Req 5.1–5.6_
-  - [ ] 7.4 Wire it in `index.ts`/`gateway.ts` and add `--device-control` to the gateway service in `docker-compose.yml`, extending `tooling/test/compose-static.test.ts` — _Req 5.2, 8.6_
-  - [ ] 7.5 Write `services/gateway/test/device-control-route.test.ts`: **Property 3**; `move` → `action_not_allowed` with nothing sent; `say` in quiet hours → `quiet_hours` with nothing sent; the two 403 cases; `invalid_fields`; `/v1/commands` unchanged — _Req 8.2, 8.3_
+- [x] 7. Wave 4 — the Device_Control_Route
+  - [x] 7.1 Extend `services/gateway/src/listen-host.ts` with `DEVICE_CONTROL_ARGUMENT` and `deviceControlEnabled`, plus its `listen-host.test.ts` cases — _Req 5.2_
+  - [x] 7.2 Extend `services/gateway/src/brain/tools/device-action.ts` with `send()`, refactoring `request()` to call it; allow-list unchanged — _Req 5.3, 5.4, 5.6, 7.8_
+  - [x] 7.3 Add the route: `request-guard.ts` gains `device_control_disabled` and `action_refused`; `operator-routes.ts` gains the POST route, its two deps and the handler; `/v1/commands` untouched — _Req 5.1–5.6_
+  - [x] 7.4 Wire it in `index.ts`/`gateway.ts` and add `--device-control` to the gateway service in `docker-compose.yml`, extending `tooling/test/compose-static.test.ts` — _Req 5.2, 8.6_
+  - [x] 7.5 Write `services/gateway/test/device-control-route.test.ts`: **Property 3**; `move` → `action_not_allowed` with nothing sent; `say` in quiet hours → `quiet_hours` with nothing sent; the two 403 cases; `invalid_fields`; `/v1/commands` unchanged — _Req 8.2, 8.3_
 
-- [ ] 8. Wave 4 — Device Control tab
-  - [ ] 8.1 Add `apps/admin/src/control/control-client.ts` (own origin, the shape-based `proxy_disabled` refusal) — _Req 5.7, 7.5_
-  - [ ] 8.2 Add `apps/admin/src/pages/control-page.tsx` plus route and nav: derived controls, the frozen minimal-`data` table, `cmd_id` then ack, the disabled notice, no `move` — _Req 5.7_
-  - [ ] 8.3 Extend `vite-proxy.ts`, `vite.config.ts`, the root `package.json` (`dev:admin:device`) and `apps/admin/test/vite-proxy.test.ts` — _Req 5.8_
-  - [ ] 8.4 Write `apps/admin/test/control-page.test.tsx`: a send showing its `cmd_id`, the ack from the stream, a refusal shown as its `PolicyRefusal`, no `move` control — _Req 8.5_
-  - [ ] 8.5 Full check and browser walkthrough, then commit and push Wave 4: all five allow-listed commands acked, driven rows green, `move` refused — _Req 4.5, 4.6, 8.7, 8.8_
+- [x] 8. Wave 4 — Device Control tab
+  - [x] 8.1 Add `apps/admin/src/control/control-client.ts` (own origin, the shape-based `proxy_disabled` refusal) — brought forward into Wave 3 because Req 4.5 is a Wave 3 requirement; its own test arrived with the Wave 3 review fix — _Req 5.7, 7.5_
+  - [x] 8.2 Add `apps/admin/src/pages/control-page.tsx` plus route and nav: derived controls, the frozen minimal-`data` table, `cmd_id` then ack, the disabled notice, no `move`, and a visible target-device selector (Wave 3 review finding 6) — _Req 5.7_
+  - [x] 8.3 Extend `vite-proxy.ts`, `vite.config.ts`, the root `package.json` (`dev:admin:device`) and `apps/admin/test/vite-proxy.test.ts` — _Req 5.8_
+  - [x] 8.4 Write `apps/admin/test/control-page.test.tsx`: a send showing its `cmd_id`, the ack from the stream, a refusal shown as its `PolicyRefusal`, no `move` control — _Req 8.5_
+  - [x] 8.5 Full check and live walkthrough, then commit and push Wave 4: all five allow-listed commands acked `done`, every one of the eleven driven rows green (five on their ack, six on the gate's expected refusal), `move` refused `action_not_allowed` — recorded as a written walkthrough plus a live capture, which is what C15 permits in place of browser automation — _Req 4.5, 4.6, 8.7, 8.8_
+  - [x] 8.6 Add the tooling check comparing the console's `OPERATOR_DRIVABLE` with the gate's `CONVERSATIONAL`, so the allow-list cannot drift in either direction (Wave 3 review finding 2) — _Req 7.8, 8.6_
 
 - [ ] 9. Wave 5 — Intern Integration Guide
   - [ ] 9.1 Write `docs/intern-integration-guide.md` as designed, and link it from `README.md` with one new `tooling/test/readme.test.ts` assertion — _Req 6.1–6.6_

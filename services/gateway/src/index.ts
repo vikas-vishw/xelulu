@@ -16,6 +16,7 @@ import { createGateway, OperatorListenError, ProviderRefusedError } from "./gate
 import { randomIds } from "./ids.js";
 import {
   contentAdminEnabled,
+  deviceControlEnabled,
   hasListenAllArgument,
   operatorTranscriptsEnabled,
 } from "./listen-host.js";
@@ -51,6 +52,9 @@ if (!result.ok) {
     // Local_Mode only, and off unless asked for: without it every Operator_Content_Route write
     // answers 403 before it reads a body byte (Phase 4 C23).
     contentAdmin: contentAdminEnabled(result.config.localMode, process.argv.slice(2)),
+    // Local_Mode only, and off unless asked for: without it the Device_Control_Route answers 403
+    // before it reads a body byte (Phase 6 C11).
+    deviceControl: deviceControlEnabled(result.config.localMode, process.argv.slice(2)),
   });
   installProcessHandlers(
     process,

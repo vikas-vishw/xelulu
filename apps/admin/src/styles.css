@@ -290,6 +290,46 @@ a {
   border-radius: 0.25rem;
 }
 
+/* Device control (Phase 6): the allow-listed send buttons, the target selector and the attempt
+   log. Every outcome is a word; there is no control for an action the gate does not allow. */
+.control-note {
+  padding: 0.75rem;
+  border: 1px dashed var(--xl-border);
+  border-radius: 0.25rem;
+}
+.control-target label {
+  font-weight: 600;
+}
+.control-target select {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  color: var(--xl-body);
+  background-color: var(--xl-bg);
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+}
+.control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.control-actions button {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.75rem;
+  color: var(--xl-body);
+  background-color: var(--xl-bg);
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+}
+.control-cmd-id,
+.control-table td {
+  font-variant-numeric: tabular-nums;
+}
+.control-cmd-id {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
 /* Live log */
 
 .live-log-filter {

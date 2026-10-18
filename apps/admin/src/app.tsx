@@ -5,6 +5,7 @@
 // `fetch` call sites (Phase 4 Req 17.7; Phase 6 C10).
 // No env read, no Panel_Key name, no URL literal. Nothing here animates.
 import { ContentPage } from "./pages/content-page";
+import { ControlPage } from "./pages/control-page";
 import { ConversationPage } from "./pages/conversation-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { DevicesPage } from "./pages/devices-page";
@@ -23,7 +24,10 @@ export type AppProps = Readonly<{
   createSource?: CreateSource;
   /** The Content page's client; the browser's `fetch` unless a test passes a fake. */
   contentClient?: ContentClient;
-  /** The Test Matrix's Device_Control_Route client; the browser's `fetch` unless a test fakes it. */
+  /**
+   * The Device_Control_Route client, shared by the Test Matrix's driven rows and the Device
+   * Control page; the browser's `fetch` unless a test passes a fake.
+   */
   controlClient?: ControlClient;
 }>;
 
@@ -31,6 +35,7 @@ const NAV_ITEMS: readonly Readonly<{ page: ConsolePage; label: string }>[] = [
   { page: "dashboard", label: "Dashboard" },
   { page: "devices", label: "Devices" },
   { page: "matrix", label: "Test matrix" },
+  { page: "control", label: "Device control" },
   { page: "live", label: "Devices and live log" },
   { page: "conversation", label: "Conversation" },
   { page: "content", label: "Content and AI" },
@@ -66,6 +71,12 @@ export function App({ createSource = browserEventSource, contentClient, controlC
             <DevicesPage devices={state.devices} entries={state.entries} />
           ) : page === "matrix" ? (
             <MatrixPage
+              {...(controlClient === undefined ? {} : { client: controlClient })}
+              devices={state.devices}
+              entries={state.entries}
+            />
+          ) : page === "control" ? (
+            <ControlPage
               {...(controlClient === undefined ? {} : { client: controlClient })}
               devices={state.devices}
               entries={state.entries}

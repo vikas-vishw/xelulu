@@ -27,8 +27,10 @@ const NODE_SERVICE_PORTS: Record<(typeof NODE_SERVICES)[number], string> = {
   simulator: "127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}",
 };
 // Req 21.7: each service's exact `command`. The gateway also carries the Transcripts_Argument, so
-// the local stack's operator channel shows transcript text, and the Content_Admin_Argument, so the
-// Content page's writes are accepted (both Local_Mode only); the simulator takes neither.
+// the local stack's operator channel shows transcript text, the Content_Admin_Argument, so the
+// Content page's writes are accepted, and the Phase 6 Device_Control_Argument, so the console's
+// Device Control page may fire the five allow-listed commands through the Device_Action_Gate (all
+// three Local_Mode only); the simulator takes none of them.
 const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly string[]> = {
   gateway: [
     "node",
@@ -36,6 +38,7 @@ const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly stri
     "--listen-all-interfaces",
     "--operator-transcripts",
     "--content-admin",
+    "--device-control",
   ],
   simulator: ["node", "dist/index.js", "--listen-all-interfaces"],
 };
