@@ -57,6 +57,7 @@ import {
   behaviourActions,
   grandmaPlaybackNarration,
 } from "./routines/routine-behaviours.js";
+import { createDeviceSessions } from "./devices/device-session.js";
 import { createPresence, presenceDeadlineKey, type HeartbeatCause } from "./devices/presence.js";
 import { createRegistry } from "./devices/registry.js";
 import type { IdSource } from "./ids.js";
@@ -228,10 +229,51 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
   const deadlines = createDeadlines(clock);
   const log = createGatewayLog(clock, deps.sink);
   const registry = createRegistry(config.device);
-  const presence = createPresence({ deadlines, onSilence: (change) => log.add(change) });
+  // The Device_Sessions (Phase 6 C5). Driven only by messages the handlers below already parse,
+  // so no new handler, subscription, topic or Log_Entry kind exists for it.
+  const sessions = createDeviceSessions();
+  const presence = createPresence({
+    deadlines,
+    onSilence: (change) => {
+      sessions.apply(change.device_id, { kind: "silence" });
+      log.add(change);
+    },
+  });
   const dedupe = createDedupeStore();
   const statusMemory = createStatusMemory();
   const tracker = createAckTracker({ deadlines, log });
+
+  // The two session inputs the composition root cannot see directly: the Audio_Server owns its
+  // turns and the Ack_Tracker owns its outcomes, and both already write the entry that carries
+  // exactly what the session needs. Reading those entries keeps both modules unchanged, and this
+  // subscriber is registered before any Operator_Stream opens, so the hub's own subscriber runs
+  // after it and a `devices` event never carries a stale session (Phase 1.3 Req 2.3).
+  log.subscribe((entry) => {
+    if (entry.kind === "audio_turn") {
+      switch (entry.phase) {
+        case "started":
+          sessions.apply(entry.device_id, { kind: "turn_open" });
+          return;
+        case "reply_ended":
+        case "interrupted":
+        case "aborted":
+          sessions.apply(entry.device_id, { kind: "turn_closed" });
+          return;
+        default:
+          return;
+      }
+    }
+    // `action` is null only for an ack matching no Retained_Command of this Gateway's, which
+    // names no command and so is not this device's last ack.
+    if (entry.kind === "ack_result" && entry.action !== null) {
+      sessions.recordAck(entry.device_id, {
+        action: entry.action,
+        outcome: entry.outcome,
+        reason: entry.reason,
+        cmd_id: entry.cmd_id,
+      });
+    }
+  });
 
   let started = false;
   let stopped = false;
@@ -251,11 +293,18 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     fireDue();
     const d = classifyInbound(topic, payload, registry);
     if (d.kind === "reject") {
+      // A rejected message on any of the device's topics puts its session in `error` (Document C
+      // Part 2). `device_id` is null when no Registered_Device was named, and then there is no
+      // session to move.
+      if (d.entry.device_id !== null) {
+        sessions.apply(d.entry.device_id, { kind: "message_rejected" });
+      }
       log.add(d.entry);
       return;
     }
     // Recorded before its message_in entry, so a stream sees the new values with it (Req 2.3).
     if (d.kind === "status") {
+      sessions.apply(d.deviceId, { kind: "heartbeat" });
       statusMemory.record(d.deviceId, d.message.battery_pct, d.message.charging);
       // The active child comes from the device's own status (Phase 3 C9). The id is a lookup
       // key and is never logged.
@@ -265,6 +314,11 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     switch (d.kind) {
       case "hello": {
         const outcome = registry.checkHello(d.deviceId, d.message.auth);
+        // Pairing is recognition of the `hello` that already exists (Phase 6 C3). The
+        // Pairing_Code is fixed by the `fw_ver` of an accepted hello only, so a wrong token
+        // leaves the session in `error` with no code and no firmware version.
+        if (outcome === "ok") sessions.recordHello(d.deviceId, d.message.fw_ver);
+        sessions.apply(d.deviceId, { kind: "hello", accepted: outcome === "ok" });
         log.add({ kind: "auth", transport: "mqtt", device_id: d.deviceId, outcome });
         if (outcome === "ok") heartbeat(d.deviceId, "hello");
         return;
@@ -277,6 +331,14 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
         return;
       case "event": {
         const entry = dedupe.process(d.deviceId, d.message, clock.now());
+        // Document C Part 2: an accepted `error` event puts the session in `error`, and an
+        // accepted `interrupt` ends the turn it barged in on. A duplicate moves nothing.
+        if (entry.kind === "event_accepted") {
+          if (d.message.event === "error") sessions.apply(d.deviceId, { kind: "device_error" });
+          else if (d.message.event === "interrupt") {
+            sessions.apply(d.deviceId, { kind: "turn_closed" });
+          }
+        }
         log.add(entry);
         // Only a new interrupt barges in; a duplicate changes nothing (Req 11.1, 11.4).
         if (entry.kind === "event_accepted" && d.message.event === "interrupt") {
@@ -498,7 +560,7 @@ export function createGateway(config: GatewayConfig, deps: GatewayDeps): Gateway
     buildDevicesSnapshot({ deviceIds, presence, registry, dedupe, tracker });
 
   const summaries = (): readonly DeviceSummary[] =>
-    buildDeviceSummaries({ deviceIds, presence, dedupe, status: statusMemory });
+    buildDeviceSummaries({ deviceIds, presence, dedupe, status: statusMemory, sessions });
 
   // The Operator_Stream hub only reads the Gateway_Log, the summaries and the retained views
   // (Phase 1.3 Req 1.10).

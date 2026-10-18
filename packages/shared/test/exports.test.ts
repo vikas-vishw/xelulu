@@ -122,8 +122,10 @@ import type {
   AuthOutcome,
   EventOrdering,
   LoggedEvent,
-  // Operator_Stream types (Phase 1.3).
+  // Operator_Stream types (Phase 1.3; Phase 6 C6 adds DeviceLastAck and DeviceSessionState).
+  DeviceLastAck,
   DevicePresence,
+  DeviceSessionState,
   DeviceSummary,
   OperatorStreamDevices,
   OperatorStreamEvent,
@@ -268,7 +270,9 @@ export type ListedTypes = [
   AuthOutcome,
   EventOrdering,
   LoggedEvent,
+  DeviceLastAck,
   DevicePresence,
+  DeviceSessionState,
   DeviceSummary,
   OperatorStreamDevices,
   OperatorStreamEvent,
@@ -394,6 +398,9 @@ const EXPECTED_RUNTIME_EXPORTS: readonly string[] = [
   "toSafeIssues",
   // Operator_Stream (Phase 1.3).
   "OPERATOR_STREAM_EVENTS",
+  // Phase 6 (C6): the Device_Session's one runtime list. `DeviceSessionState` and `DeviceLastAck`
+  // are types and are not here.
+  "DEVICE_SESSION_STATES",
   // Phase 3 (C3, C6, C13): the new Gateway_Log lists, the supported languages and the codec.
   "BRAIN_TURN_PHASES",
   "BRAIN_TURN_CAUSES",
@@ -455,8 +462,9 @@ function looksLikeWireMessage(value: unknown): boolean {
 describe("@xelulu/shared entry point", () => {
   it("exports exactly the runtime names in the design's public export list", () => {
     // Phase 1.2 and 1.3 left 158; Phase 3 added the 18 names its design lists, reaching 176;
-    // Phase 4 adds exactly the 23 names its design lists (Req 20.5).
-    expect(EXPECTED_RUNTIME_EXPORTS).toHaveLength(199);
+    // Phase 4 added exactly the 23 names its design lists (Req 20.5), reaching 199; Phase 6 adds
+    // exactly one, DEVICE_SESSION_STATES (Req 2.6).
+    expect(EXPECTED_RUNTIME_EXPORTS).toHaveLength(200);
     expect(new Set(EXPECTED_RUNTIME_EXPORTS).size).toBe(EXPECTED_RUNTIME_EXPORTS.length);
     expect(Object.keys(ns).sort()).toEqual([...EXPECTED_RUNTIME_EXPORTS].sort());
   });

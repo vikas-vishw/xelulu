@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { isoAt } from "../src/clock.js";
 import { createDeadlines } from "../src/deadlines.js";
 import { createDedupeStore } from "../src/devices/dedupe-store.js";
+import { createDeviceSessions } from "../src/devices/device-session.js";
+import { pairingCode } from "../src/devices/pairing-code.js";
 import { createPresence } from "../src/devices/presence.js";
 import {
   buildDeviceSummaries,
@@ -16,11 +18,13 @@ import { createTestClock } from "./support/test-clock.js";
 
 const DEVICE = "xlu_000123";
 const OTHER = "xlu_000456";
+const FW_VER = "0.1.0";
 
 function sources(): SummarySources & {
   presence: ReturnType<typeof createPresence>;
   dedupe: ReturnType<typeof createDedupeStore>;
   status: ReturnType<typeof createStatusMemory>;
+  sessions: ReturnType<typeof createDeviceSessions>;
 } {
   const clock = createTestClock();
   return {
@@ -28,6 +32,7 @@ function sources(): SummarySources & {
     presence: createPresence({ deadlines: createDeadlines(clock), onSilence: () => undefined }),
     dedupe: createDedupeStore(),
     status: createStatusMemory(),
+    sessions: createDeviceSessions(),
   };
 }
 
@@ -54,6 +59,10 @@ describe("buildDeviceSummaries", () => {
         charging: null,
         events_accepted: 0,
         events_duplicate: 0,
+        session: "unpaired",
+        pairing_code: null,
+        fw_ver: null,
+        last_ack: null,
       },
       {
         device_id: OTHER,
@@ -63,8 +72,38 @@ describe("buildDeviceSummaries", () => {
         charging: null,
         events_accepted: 0,
         events_duplicate: 0,
+        session: "unpaired",
+        pairing_code: null,
+        fw_ver: null,
+        last_ack: null,
       },
     ]);
+  });
+
+  // Phase 6 C6, Req 2.5: the four session fields, per device and null before their first message.
+  it("carries the session, pairing code, fw_ver and last ack of that device only", () => {
+    const src = sources();
+    src.sessions.recordHello(DEVICE, FW_VER);
+    src.sessions.apply(DEVICE, { kind: "hello", accepted: true });
+    src.sessions.recordAck(DEVICE, {
+      action: "say",
+      outcome: "done",
+      reason: "",
+      cmd_id: "cmd_1",
+    });
+    const [mine, other] = buildDeviceSummaries(src);
+    expect(mine).toMatchObject({
+      session: "connected",
+      pairing_code: pairingCode(DEVICE, FW_VER),
+      fw_ver: FW_VER,
+      last_ack: { action: "say", outcome: "done", reason: "", cmd_id: "cmd_1" },
+    });
+    expect(other).toMatchObject({
+      session: "unpaired",
+      pairing_code: null,
+      fw_ver: null,
+      last_ack: null,
+    });
   });
 
   it("carries the latest recorded status values for that device only", () => {
@@ -109,6 +148,10 @@ describe("buildDeviceSummaries", () => {
         "events_duplicate",
         "last_heartbeat_at",
         "presence",
+        "session",
+        "pairing_code",
+        "fw_ver",
+        "last_ack",
       ].sort(),
     );
   });

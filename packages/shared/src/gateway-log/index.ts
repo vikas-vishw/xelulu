@@ -106,12 +106,14 @@ export type {
 export { CONTRACT_FIELD_NAMES } from "./contract-field-names.js";
 export { toSafeIssues } from "./safe-issues.js";
 
-// Operator_Stream payloads (Phase 1.3, Req 2.5; Phase 3 C4, Req 18.1).
-export { OPERATOR_STREAM_EVENTS } from "./stream.js";
+// Operator_Stream payloads (Phase 1.3, Req 2.5; Phase 3 C4, Req 18.1; Phase 6 C6, Req 2.6).
+export { DEVICE_SESSION_STATES, OPERATOR_STREAM_EVENTS } from "./stream.js";
 export type {
   ConversationTurnState,
   ConversationTurnView,
+  DeviceLastAck,
   DevicePresence,
+  DeviceSessionState,
   DeviceSummary,
   OperatorStreamDevices,
   OperatorStreamEvent,

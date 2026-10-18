@@ -35,6 +35,10 @@ export function deviceSummary(overrides: Partial<DeviceSummary> = {}): DeviceSum
     charging: false,
     events_accepted: 0,
     events_duplicate: 0,
+    session: "idle",
+    pairing_code: "B7K2QD",
+    fw_ver: "0.1.0",
+    last_ack: null,
     ...overrides,
   };
 }

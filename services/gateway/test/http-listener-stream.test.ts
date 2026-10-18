@@ -33,6 +33,10 @@ const SUMMARY: DeviceSummary = {
   charging: null,
   events_accepted: 0,
   events_duplicate: 0,
+  session: "unpaired",
+  pairing_code: null,
+  fw_ver: null,
+  last_ack: null,
 };
 
 type Listener = Awaited<ReturnType<typeof listenOperatorHttp>>;

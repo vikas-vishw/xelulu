@@ -1,12 +1,14 @@
 // Device_Summaries for the Operator_Stream's `devices` event (Phase 1.3 C3, Req 2.2, 2.3). Per
 // Registered_Device: presence, last Heartbeat time (ISO 8601 UTC or null), event counts, and the
-// `battery_pct` and `charging` of its latest accepted status (null before the first). IDs, enums,
-// a time, counts and telemetry only. Pure: no network import. `GET /v1/devices` stays on
-// snapshot.ts unchanged (Phase 1.2 Req 13.4).
+// `battery_pct` and `charging` of its latest accepted status (null before the first). Phase 6 (C6)
+// adds four read-only fields from the Device_Session: `session`, `pairing_code`, `fw_ver` and
+// `last_ack`. IDs, enums, a time, counts and telemetry only. Pure: no network import.
+// `GET /v1/devices` stays on snapshot.ts unchanged (Phase 1.2 Req 13.4).
 import type { DeviceSummary } from "@xelulu/shared";
 
 import { isoAt } from "../clock.js";
 import type { DedupeStore } from "../devices/dedupe-store.js";
+import type { DeviceSessions } from "../devices/device-session.js";
 import type { Presence } from "../devices/presence.js";
 
 export type StatusTelemetry = Readonly<{ battery_pct: number; charging: boolean }>;
@@ -32,6 +34,8 @@ export type SummarySources = Readonly<{
   presence: Pick<Presence, "state" | "lastHeartbeatAt">;
   dedupe: Pick<DedupeStore, "forDevice">;
   status: Pick<StatusMemory, "latest">;
+  /** Phase 6 C6: the Device_Session's four additive fields. Read only; nothing is computed here. */
+  sessions: Pick<DeviceSessions, "state" | "fwVer" | "pairingCode" | "lastAck">;
 }>;
 
 /** One frozen Device_Summary per id, in `deviceIds` order. Reads only; changes no state. */
@@ -49,6 +53,10 @@ export function buildDeviceSummaries(src: SummarySources): readonly DeviceSummar
         charging: status === null ? null : status.charging,
         events_accepted: dedupe.accepted,
         events_duplicate: dedupe.duplicates,
+        session: src.sessions.state(deviceId),
+        pairing_code: src.sessions.pairingCode(deviceId),
+        fw_ver: src.sessions.fwVer(deviceId),
+        last_ack: src.sessions.lastAck(deviceId),
       });
     }),
   );

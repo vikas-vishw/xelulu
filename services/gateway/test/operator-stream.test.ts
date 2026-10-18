@@ -37,14 +37,20 @@ const TOKEN_SENTINEL = "SENTINEL-stream-device-token-5b9e";
 const PASSWORD_SENTINEL = "SENTINEL-stream-mqtt-password-71c4";
 const HELLO_AUTH_SENTINEL = "SENTINEL-stream-hello-auth-d02a";
 
+// Sorted, because the assertion below compares against sorted keys. The last four are the
+// Phase 6 C6 additions: session, pairing_code, fw_ver and last_ack.
 const SUMMARY_FIELDS = [
   "battery_pct",
   "charging",
   "device_id",
   "events_accepted",
   "events_duplicate",
+  "fw_ver",
+  "last_ack",
   "last_heartbeat_at",
+  "pairing_code",
   "presence",
+  "session",
 ];
 
 const harnesses: Harness[] = [];
@@ -179,6 +185,11 @@ describe("Operator_Stream over the loopback Operator_Surface", () => {
         charging: null,
         events_accepted: 0,
         events_duplicate: 0,
+        // Phase 6 C6: before any hello the device is unpaired, with no code, firmware or ack.
+        session: "unpaired",
+        pairing_code: null,
+        fw_ver: null,
+        last_ack: null,
       },
     ]);
     expect(Object.keys(devices[0] ?? {}).sort()).toEqual(SUMMARY_FIELDS);
@@ -221,8 +232,13 @@ describe("Operator_Stream over the loopback Operator_Surface", () => {
     await h.device.event("cry");
     await pollUntil(() => h.entries.some((e) => e.kind === "message_rejected") && caughtUp(h, r));
 
-    // A successful hello: the auth entry changes nothing; presence online does.
-    expect(after(r, (e) => e.kind === "auth" && e.outcome === "ok")?.name).toBe("entry");
+    // A successful hello: since Phase 6 (C5, C6) its auth entry does change the summary — the
+    // Device_Session becomes `connected` and the Pairing_Code and `fw_ver` appear — so a devices
+    // event follows it. Presence online then follows with its own.
+    const paired = devicesOf(after(r, (e) => e.kind === "auth" && e.outcome === "ok"));
+    expect(paired[0]).toMatchObject({ session: "connected", presence: "unknown" });
+    expect(paired[0]?.pairing_code).toMatch(/^[0-9BCDFGHJKLMNPQRSTVWXYZ]{6}$/);
+    expect(paired[0]?.fw_ver).not.toBeNull();
     const online = devicesOf(after(r, (e) => e.kind === "presence" && e.state === "online"));
     expect(online[0]).toMatchObject({ presence: "online", battery_pct: null, charging: null });
     expect(online[0]?.last_heartbeat_at).not.toBeNull();
@@ -234,8 +250,13 @@ describe("Operator_Stream over the loopback Operator_Surface", () => {
     const accepted = devicesOf(after(r, (e) => e.kind === "event_accepted"));
     expect(accepted[0]).toMatchObject({ events_accepted: 1, events_duplicate: 0 });
 
-    // A refused hello changes no summary: its auth entry is followed by no devices event.
-    expect(after(r, (e) => e.kind === "auth" && e.outcome === "failed")?.name).toBe("entry");
+    // A refused hello takes the Device_Session to `error` (Document C Part 2), so its auth entry
+    // is followed by a devices event carrying that — and no new firmware version or code, because
+    // only an accepted hello fixes those.
+    const refused = devicesOf(after(r, (e) => e.kind === "auth" && e.outcome === "failed"));
+    expect(refused[0]).toMatchObject({ session: "error" });
+    expect(refused[0]?.pairing_code).toBe(paired[0]?.pairing_code);
+    // The rejected event that follows changes nothing: the session is already `error`.
     expect(after(r, (e) => e.kind === "message_rejected")).toBeUndefined();
 
     // The latest devices event equals the summaries now.

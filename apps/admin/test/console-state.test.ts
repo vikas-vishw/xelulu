@@ -51,6 +51,10 @@ function device(device_id: string, presence: DeviceSummary["presence"]): DeviceS
     charging: null,
     events_accepted: 0,
     events_duplicate: 0,
+    session: "unpaired",
+    pairing_code: null,
+    fw_ver: null,
+    last_ack: null,
   };
 }
 
