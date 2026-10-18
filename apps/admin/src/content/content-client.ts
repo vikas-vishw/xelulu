@@ -1,5 +1,6 @@
-// The Content page's transport (Phase 4 Req 16, 17.6, 17.6a): the ONLY `fetch` call site in the
-// console, and the only module that knows a request path.
+// The Content page's transport (Phase 4 Req 16, 17.6, 17.6a): one of the console's two `fetch`
+// call sites — `control/control-client.ts` is the other, added in Phase 6 for the one
+// Device_Control_Route — and the only module that knows a content or stream request path.
 //
 // Four reads and eight writes, all same-origin, all JSON, no credentials. Every call answers a
 // discriminated result and NEVER throws, so a page render can never be taken down by a network

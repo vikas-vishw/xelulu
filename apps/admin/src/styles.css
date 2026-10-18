@@ -250,6 +250,45 @@ a {
   border: 1px dashed var(--xl-border);
   border-radius: 0.25rem;
 }
+/* Test matrix (Phase 6): two tables, one per direction. Status is always a word; the run controls
+   exist only on the driven table, because an observed row originates at the device. */
+.matrix-note,
+.matrix-no-device {
+  padding: 0.75rem;
+  border: 1px dashed var(--xl-border);
+  border-radius: 0.25rem;
+}
+.matrix-totals {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--xl-title);
+}
+.matrix-table th[scope="row"],
+.matrix-status {
+  white-space: nowrap;
+}
+.matrix-evidence {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.matrix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.matrix-row-actions {
+  white-space: nowrap;
+}
+.matrix-actions button,
+.matrix-row-actions button {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.75rem;
+  color: var(--xl-body);
+  background-color: var(--xl-bg);
+  border: 1px solid var(--xl-border);
+  border-radius: 0.25rem;
+}
 
 /* Live log */
 

@@ -33,17 +33,17 @@ Baseline that must not regress: `corepack pnpm test` = 119 Vitest files / 2,452 
   - [x] 4.2 Add `apps/admin/src/pages/devices-page.tsx` with every cell of Req 3.2 and 3.3; text-only states, no animation — _Req 3.2–3.5_
   - [x] 4.3 Add the page to `routing/use-hash-page.ts` and `app.tsx`; existing pages unchanged — _Req 3.1_
   - [x] 4.4 Write `apps/admin/test/devices-page.test.tsx` (RTL + fake EventSource): the row with session, pairing code and a zone cell; a session change; offline clearing in-turn; nothing secret rendered — _Req 3.5, 8.5_
-  - [x] 4.5 Browser walkthrough, then commit and push Wave 2: device appears paired with a code, a touch on each zone lands, offline shows — screenshots recorded — _Req 3.4, 8.8_
+  - [x] 4.5 Browser walkthrough, then commit and push Wave 2: device appears paired with a code, a touch on each zone lands, offline shows — recorded as a written walkthrough plus a live `/v1/stream` capture, which is what C15 permits in place of browser automation — _Req 3.4, 8.8_
 
-- [ ] 5. Wave 3 — Test Matrix
-  - [ ] 5.1 Add `apps/admin/src/matrix/test-matrix.ts`: `buildMatrix(lists?)` over the three contract lists plus `FIXED_ROWS`; `expectRefusal` from an exhaustive `Record<CmdAction, boolean>`; no wire value as a literal — _Req 4.1, 4.2, 4.3, 4.6, 7.10_
-  - [ ] 5.2 Add `apps/admin/src/matrix/matrix-state.ts`: the pure reducer, observed matching by entry shape, driven by `cmd_id`, `pending` on no match, evidence of ids/enums/counts/times — _Req 4.4, 4.8, 4.9_
-  - [ ] 5.3 Add `apps/admin/src/pages/matrix-page.tsx` plus its route and nav: run controls on driven rows only, the "originates at the device" line on observed rows, totals, reset — _Req 4.5, 4.7, 4.9_
-  - [ ] 5.4 Write `apps/admin/test/test-matrix.test.ts` (**Property 4**, the substituted extra action), `matrix-state.test.ts` (**Property 5**, each observed match, driven pass/fail, `expectRefusal`), `matrix-page.test.tsx` (an observed row has no run control and greens on a matching entry) — _Req 8.4, 8.5_
-  - [ ] 5.5 Add `tooling/test/matrix-derivation.test.ts` reusing `findContractMisuse` — _Req 7.10, 8.6_
-  - [ ] 5.6 Full check and browser walkthrough, then commit and push Wave 3: every observed row fired from the simulator panel (wake, 7 zones, cry, motion, button, nfc, interrupt, error, an audio turn, an ack-policy `rejected`) and seen green — _Req 4.8, 8.7, 8.8_
+- [x] 5. Wave 3 — Test Matrix
+  - [x] 5.1 Add `apps/admin/src/matrix/test-matrix.ts`: `buildMatrix(lists?)` over the three contract lists plus `FIXED_ROWS`; `expectRefusal` from an exhaustive `Record<CmdAction, boolean>`; no wire value as a literal — _Req 4.1, 4.2, 4.3, 4.6, 7.10_
+  - [x] 5.2 Add `apps/admin/src/matrix/matrix-state.ts`: the pure reducer, observed matching by entry shape, driven by `cmd_id`, `pending` on no match, evidence of ids/enums/counts/times. Results are LATCHED (folded once per `seq`), not re-derived from the capped window — _Req 4.4, 4.8, 4.9_
+  - [x] 5.3 Add `apps/admin/src/pages/matrix-page.tsx` plus its route and nav: run controls on driven rows only, the "originates at the device" line on observed rows, totals, reset. Its send path is `control/control-client.ts` and `control/command-data.ts`, brought forward from task 8.1 because Req 4.5 is a Wave 3 requirement — _Req 4.5, 4.7, 4.9_
+  - [x] 5.4 Write `apps/admin/test/test-matrix.test.ts` (**Property 4**, the substituted extra action), `matrix-state.test.ts` (**Property 5**, each observed match, driven pass/fail, `expectRefusal`), `matrix-page.test.tsx` (an observed row has no run control and greens on a matching entry) — _Req 8.4, 8.5_
+  - [x] 5.5 Add `tooling/test/matrix-derivation.test.ts` reusing `findContractMisuse`, and extend `placeholder.test.ts`'s console-request check additively for the second `fetch` module and the new path — _Req 7.10, 8.6_
+  - [x] 5.6 Full check and live run, then commit and push Wave 3: every observed row fired from the simulator panel (wake, 7 zones, cry, motion, button, nfc, interrupt, error, an audio turn, an ack-policy `rejected`) and seen green — all 17 observed rows passed when the captured live stream was folded through the real reducer — _Req 4.8, 8.7, 8.8_
 
-- [ ] 6. Checkpoint — all tests pass; surface any FLAG before continuing
+- [x] 6. Checkpoint — all tests pass; surface any FLAG before continuing
 
 - [ ] 7. Wave 4 — the Device_Control_Route
   - [ ] 7.1 Extend `services/gateway/src/listen-host.ts` with `DEVICE_CONTROL_ARGUMENT` and `deviceControlEnabled`, plus its `listen-host.test.ts` cases — _Req 5.2_

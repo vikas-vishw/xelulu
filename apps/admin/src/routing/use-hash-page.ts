@@ -1,9 +1,10 @@
 // Hash routing with no router dependency: `#/` is the Dashboard, `#/live` is Devices + Live Log,
-// `#/conversation` is the Conversation page and `#/devices` is the Phase 6 Devices page. Any other
-// hash shows the Dashboard. Follows `hashchange`.
+// `#/conversation` is the Conversation page, `#/devices` is the Phase 6 Devices page and
+// `#/matrix` is the Phase 6 Test Matrix. Any other hash shows the Dashboard. Follows
+// `hashchange`.
 import { useSyncExternalStore } from "react";
 
-export type ConsolePage = "dashboard" | "live" | "conversation" | "content" | "devices";
+export type ConsolePage = "dashboard" | "live" | "conversation" | "content" | "devices" | "matrix";
 
 /** The hash that opens each page, for nav links. */
 export const PAGE_HASHES: Readonly<Record<ConsolePage, string>> = Object.freeze({
@@ -12,6 +13,7 @@ export const PAGE_HASHES: Readonly<Record<ConsolePage, string>> = Object.freeze(
   conversation: "#/conversation",
   content: "#/content",
   devices: "#/devices",
+  matrix: "#/matrix",
 });
 
 /** Pure: the page for a `location.hash` value. */
@@ -20,6 +22,7 @@ export function pageFromHash(hash: string): ConsolePage {
   if (hash === PAGE_HASHES.conversation) return "conversation";
   if (hash === PAGE_HASHES.content) return "content";
   if (hash === PAGE_HASHES.devices) return "devices";
+  if (hash === PAGE_HASHES.matrix) return "matrix";
   return "dashboard";
 }
 

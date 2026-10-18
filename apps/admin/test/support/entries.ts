@@ -1,10 +1,16 @@
 // Typed sample stream payloads for the admin console tests: Device_Summaries and Log_Entries
 // with the exact shapes the Gateway writes (IDs and Closed_Enum values only).
 import type {
+  AckReason,
   AckResultLogEntry,
+  AckResultOutcome,
+  AudioTurnLogEntry,
+  AudioTurnPhase,
+  CmdAction,
   ConversationTurnView,
   DeviceSummary,
   EventAcceptedLogEntry,
+  EventKind,
   MessageOutLogEntry,
   TouchGesture,
   TouchZone,
@@ -122,6 +128,82 @@ export function turnView(overrides: Partial<ConversationTurnView> = {}): Convers
     transcript_text: null,
     reply_text: null,
     ...overrides,
+  };
+}
+
+/**
+ * An accepted event of any kind but `touch`, with the Closed_Enum `data` its kind carries
+ * (Phase 6: the Test_Matrix's observed rows). `touch` has `touchAccepted` above, because its
+ * `data` needs a zone.
+ */
+export function eventAccepted(
+  seq: number,
+  event: Exclude<EventKind, "touch">,
+): EventAcceptedLogEntry {
+  const base = {
+    log_ver: 3 as const,
+    seq,
+    at: atFor(seq),
+    kind: "event_accepted" as const,
+    device_id: DEVICE_ID,
+    event_id: `ev_${pad(seq)}`,
+    time_uncertain: false,
+    back_dated: false,
+    ordering: "device_ts" as const,
+    device_ts: Math.floor((BASE_MS + seq * 1_000) / 1_000),
+    received_at: atFor(seq),
+  };
+  if (event === "wake") return { ...base, event, data: { source: "hey_lulu" } };
+  if (event === "motion") return { ...base, event, data: { event: "pickup" } };
+  if (event === "button") {
+    return { ...base, event, data: { button: "belly_talk", action: "press" } };
+  }
+  return { ...base, event, data: {} };
+}
+
+/** One phase of one audio turn (Phase 6: the `audio_turn` fixed row). Counts and enums only. */
+export function audioTurn(
+  seq: number,
+  phase: AudioTurnPhase,
+  turnId: string = TURN_ID,
+): AudioTurnLogEntry {
+  return {
+    log_ver: 3,
+    seq,
+    at: atFor(seq),
+    kind: "audio_turn",
+    device_id: DEVICE_ID,
+    turn_id: turnId,
+    phase,
+    frames_in: 0,
+    bytes_in: 0,
+    frames_out: 0,
+    cause: null,
+    issues: [],
+  };
+}
+
+/** An ack the Gateway matched to one of its commands (Phase 6: every driven row's verdict). */
+export function ackResult(
+  seq: number,
+  fields: Readonly<{
+    cmd_id: string;
+    action: CmdAction | null;
+    outcome: AckResultOutcome;
+    reason?: "" | AckReason | null;
+  }>,
+): AckResultLogEntry {
+  return {
+    log_ver: 3,
+    seq,
+    at: atFor(seq),
+    kind: "ack_result",
+    device_id: DEVICE_ID,
+    cmd_id: fields.cmd_id,
+    action: fields.action,
+    outcome: fields.outcome,
+    reason: fields.reason ?? "",
+    timeout_cause: null,
   };
 }
 

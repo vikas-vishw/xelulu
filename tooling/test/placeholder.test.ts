@@ -572,9 +572,10 @@ describe("placeholder screens and package boundaries", () => {
     });
 
     /**
-     * The Operator_Stream route plus the twelve Operator_Content_Routes (Phase 4 Req 17.7, 20.4).
-     * Restated here rather than imported, because `tooling/` reads the repo with fs and the list
-     * is the point of the check: the console may request these thirteen paths and nothing else.
+     * The Operator_Stream route, the twelve Operator_Content_Routes (Phase 4 Req 17.7, 20.4) and
+     * the one Device_Control_Route (Phase 6 C10, Req 7.5). Restated here rather than imported,
+     * because `tooling/` reads the repo with fs and the list is the point of the check: the
+     * console may request these fourteen paths and nothing else.
      */
     const CONSOLE_REQUEST_PATHS: ReadonlySet<string> = new Set([
       "/v1/stream",
@@ -590,17 +591,24 @@ describe("placeholder screens and package boundaries", () => {
       "/v1/grandma/schedule",
       "/v1/grandma/call",
       "/v1/routines/run",
+      "/v1/device-control",
     ]);
 
-    /** The one module allowed a `fetch` call site; `use-console-stream.ts` opens an EventSource. */
-    const CONSOLE_FETCH_FILE = "apps/admin/src/content/content-client.ts";
+    /**
+     * The only modules allowed a `fetch` call site; `use-console-stream.ts` opens an EventSource.
+     * Phase 6 adds the second one for the Device_Control_Route, and no third is permitted.
+     */
+    const CONSOLE_FETCH_FILES: readonly string[] = [
+      "apps/admin/src/content/content-client.ts",
+      "apps/admin/src/control/control-client.ts",
+    ];
 
     // Phase 4 C23: before this phase the console's only request was the stream and nothing
     // statically forbade a second one. It now calls `fetch` twelve ways, so the rule needs a real
     // enforcer rather than a sentence in a requirement.
-    it("requests only the stream and the content routes, and calls fetch in one module", () => {
+    it("requests only the stream, the content routes and device control, from two modules", () => {
       const tsFiles = srcFiles.filter((abs) => [".ts", ".tsx"].includes(extname(abs)));
-      expect(tsFiles.map(toRepoPath)).toContain(CONSOLE_FETCH_FILE);
+      expect(tsFiles.map(toRepoPath)).toEqual(expect.arrayContaining([...CONSOLE_FETCH_FILES]));
 
       const seen = new Set<string>();
       const fetchFiles: string[] = [];
@@ -618,9 +626,9 @@ describe("placeholder screens and package boundaries", () => {
         if (/(?<![\w$.])fetch\s*\(/.test(code)) fetchFiles.push(where);
       }
 
-      // Not vacuous: the thirteen paths are all written down, in the two client modules only.
+      // Not vacuous: the fourteen paths are all written down, in the client modules only.
       expect([...seen].sort()).toEqual([...CONSOLE_REQUEST_PATHS].sort());
-      expect(fetchFiles).toEqual([CONSOLE_FETCH_FILE]);
+      expect([...fetchFiles].sort()).toEqual([...CONSOLE_FETCH_FILES].sort());
     });
 
     it("the built bundle in apps/admin/dist contains no Panel_Key name", () => {
