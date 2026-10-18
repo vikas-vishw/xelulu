@@ -75,6 +75,14 @@ export const TURN_FRAMES = 50;
 export const REPLAYED_EVENTS = 5;
 
 export const DEVICE_ID_VALUE = "xlu_ci_sim";
+
+/**
+ * The CI device's broker password. Anonymous broker access is off, so this value must be a user
+ * EMQX knows: it is seeded in `tooling/emqx/auth-bootstrap.json`, and a test pins the two
+ * together. It replaces a per-run random token, which the broker could never have recognised.
+ * A dev placeholder for a loopback-or-LAN dev stack, never a real secret.
+ */
+export const CI_DEVICE_TOKEN = "dev_ci_sim_only_not_a_secret";
 export const PASSED_LINE = "PASSED 23.1–23.8 + stream + conversation + content";
 export const REDACTED = "[redacted]";
 
@@ -155,8 +163,10 @@ export function localEnvEntries(token: string): readonly EnvEntry[] {
   return [
     ["APP_ENV", "local"],
     ["MQTT_BROKER_URL", urlFrom("mqtt", "emqx", 1883)],
-    ["MQTT_USERNAME", ""],
-    ["MQTT_PASSWORD", ""],
+    // MQTT_USERNAME and MQTT_PASSWORD are deliberately ABSENT. Anonymous broker access is off,
+    // but a root .env feeds BOTH services, so setting them here would hand the simulator the
+    // cloud's credential. Compose gives the gateway its own default; the simulator, left with
+    // none, authenticates as the device with DEVICE_ID and DEVICE_TOKEN - what firmware does.
     ["AUDIO_WSS_URL", urlFrom("ws", "gateway", 8081)],
     ["DEVICE_ID", DEVICE_ID_VALUE],
     ["DEVICE_TOKEN", token],
@@ -1651,7 +1661,8 @@ function printLogs(root: string, token: string): void {
 async function main(): Promise<number> {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const envPath = join(root, ".env");
-  const token = newDeviceToken();
+  // A credential EMQX knows, not a random one: the broker now authenticates the device.
+  const token = CI_DEVICE_TOKEN;
 
   // Req 23.11: refuse explicitly, before anything is written, when the developer already has a
   // root env file. It is never overwritten and never deleted; `cleanup` below can only remove

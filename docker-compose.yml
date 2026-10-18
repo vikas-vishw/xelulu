@@ -5,9 +5,25 @@ name: xelulu
 services:
   emqx:
     image: emqx/emqx:5.8.9 # Apache-2.0. EMQX 5.9+ is BSL 1.1 (see README).
+    # Anonymous access is OFF (LAN bring-up). One password_based/built_in_database authenticator,
+    # seeded from the bootstrap file, so a client must present a known username and password
+    # before it may publish or subscribe on any topic. The device presents its DEVICE_ID and
+    # DEVICE_TOKEN; the gateway presents MQTT_USERNAME and MQTT_PASSWORD.
+    # The bootstrap file MUST be a BOM-free single JSON array. A BOM makes EMQX log
+    # parse_authn_users_failed and then refuse EVERY client - it fails closed, but silently.
+    environment:
+      EMQX_AUTHENTICATION__1__MECHANISM: password_based
+      EMQX_AUTHENTICATION__1__BACKEND: built_in_database
+      EMQX_AUTHENTICATION__1__USER_ID_TYPE: username
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_FILE: /opt/emqx/data/auth-bootstrap.json
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_TYPE: plain
+    volumes:
+      - ./tooling/emqx/auth-bootstrap.json:/opt/emqx/data/auth-bootstrap.json:ro
     ports:
-      - "127.0.0.1:1883:1883" # MQTT
-      - "127.0.0.1:8883:8883" # MQTTS
+      # Device-facing. Loopback by default; set DEVICE_BIND_HOST=0.0.0.0 to open to the LAN.
+      - "${DEVICE_BIND_HOST:-127.0.0.1}:1883:1883" # MQTT
+      - "${DEVICE_BIND_HOST:-127.0.0.1}:8883:8883" # MQTTS
+      # Not device-facing: loopback always, whatever DEVICE_BIND_HOST says.
       - "127.0.0.1:8083:8083" # MQTT over WS
       - "127.0.0.1:8084:8084" # MQTT over WSS
       - "127.0.0.1:18083:18083" # Dashboard
@@ -34,10 +50,11 @@ services:
   # empty value, so even a `.env` copied straight from `.env.example` yields these defaults.
   # These are dev placeholders for a loopback-only stack; nothing real belongs in this file.
   #
-  # MQTT_USERNAME and MQTT_PASSWORD take the bare ${VAR} form with no default on purpose. EMQX
-  # 5.8.9 with no authenticator configured accepts anonymous connections (verified against this
-  # image), and Local_Mode maps an unset or empty broker credential to null, so the correct local
-  # value is no value.
+  # The SIMULATOR's MQTT_USERNAME and MQTT_PASSWORD keep the bare ${VAR} form with no default on
+  # purpose. Local_Mode maps an unset or empty broker credential to null, and a null credential is
+  # what makes the simulator authenticate AS THE DEVICE, with its DEVICE_ID and DEVICE_TOKEN -
+  # exactly what the firmware does. The GATEWAY has its own defaults below, because anonymous
+  # access is off and a cloud client must not present the device's token.
   #
   # AUDIO_WSS_URL names the `gateway` service at 8081: the audio listen port is that URL's port,
   # and a non-loopback host makes the gateway bind 0.0.0.0 inside its container, which is what
@@ -51,19 +68,24 @@ services:
         "--listen-all-interfaces",
         "--operator-transcripts",
         "--content-admin",
-        "--device-control",
       ]
     environment:
       APP_ENV: "${APP_ENV:-local}"
       MQTT_BROKER_URL: "${MQTT_BROKER_URL:-mqtt://emqx:1883}"
-      MQTT_USERNAME: "${MQTT_USERNAME}"
-      MQTT_PASSWORD: "${MQTT_PASSWORD}"
+      # The gateway is an MQTT client too, and anonymous access is now off, so it needs its own
+      # credential. The device's id and token are NOT reused here: cloud and device authenticate
+      # as different principals, so one leaked token cannot impersonate the other.
+      MQTT_USERNAME: "${MQTT_USERNAME:-xelulu_gateway_dev}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-dev_gateway_only_not_a_secret}"
       AUDIO_WSS_URL: "${AUDIO_WSS_URL:-ws://gateway:8081}"
       DEVICE_ID: "${DEVICE_ID:-xlu_000123}"
       DEVICE_TOKEN: "${DEVICE_TOKEN:-dev_local_only_not_a_secret}"
       GATEWAY_OPERATOR_PORT: "${GATEWAY_OPERATOR_PORT:-8090}"
     ports:
+      # The Operator_Surface is NOT device-facing: loopback always, never DEVICE_BIND_HOST.
       - "127.0.0.1:${GATEWAY_OPERATOR_PORT:-8090}:${GATEWAY_OPERATOR_PORT:-8090}"
+      # Device-facing: the per-turn audio socket. Loopback by default, LAN only via DEVICE_BIND_HOST.
+      - "${DEVICE_BIND_HOST:-127.0.0.1}:8081:8081"
     env_file:
       - path: ./.env
         required: false

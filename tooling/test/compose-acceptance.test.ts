@@ -912,8 +912,9 @@ describe(".env lines from tuples", () => {
     expect([...record.keys()]).toEqual([
       "APP_ENV",
       "MQTT_BROKER_URL",
-      "MQTT_USERNAME",
-      "MQTT_PASSWORD",
+      // MQTT_USERNAME and MQTT_PASSWORD are deliberately absent: a root .env feeds both services,
+      // so setting them would hand the simulator the cloud credential instead of letting it
+      // authenticate as the device (LAN bring-up wave).
       "AUDIO_WSS_URL",
       "DEVICE_ID",
       "DEVICE_TOKEN",
@@ -921,8 +922,10 @@ describe(".env lines from tuples", () => {
       "SIMULATOR_PANEL_PORT",
     ]);
     expect(record.get("APP_ENV")).toBe("local");
-    expect(record.get("MQTT_USERNAME")).toBe("");
-    expect(record.get("MQTT_PASSWORD")).toBe("");
+    // Absent, not empty: Compose gives the gateway its own credential, and the simulator must be
+    // left with none so it authenticates as the device.
+    expect(record.has("MQTT_USERNAME")).toBe(false);
+    expect(record.has("MQTT_PASSWORD")).toBe(false);
     expect(record.get("DEVICE_ID")).toBe(DEVICE_ID_VALUE);
     expect(record.get("DEVICE_TOKEN")).toBe(token);
     expect(record.get("GATEWAY_OPERATOR_PORT")).toBe("8090");

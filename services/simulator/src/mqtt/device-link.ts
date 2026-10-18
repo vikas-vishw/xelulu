@@ -177,8 +177,10 @@ export function createDeviceLink(deps: DeviceLinkDeps): DeviceLink {
       connection = await deps.connect({
         url: deps.broker.url,
         clientId: deviceId,
-        username: deps.broker.username,
-        password: deps.broker.password,
+        // No configured broker credential means authenticate AS THE DEVICE: its id and token
+        // are what the firmware presents, and the broker now refuses an unauthenticated client.
+        username: deps.broker.username ?? deps.device.deviceId,
+        password: deps.broker.password ?? deps.device.token,
       });
     } catch {
       // A failed attempt adds no entry (Req 15.7, G32).

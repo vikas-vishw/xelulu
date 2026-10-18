@@ -71,7 +71,7 @@ const LOCAL_DEFAULT_FILES: ReadonlySet<string> = new Set([
   "docker-compose.yml",
 ]);
 
-/** The nine keys those two files may assign: the device seam and the two local surface ports. */
+/** The ten keys those two files may assign: the device seam, two surface ports and the bind host. */
 const LOCAL_DEFAULT_KEYS: ReadonlySet<string> = new Set([
   "APP_ENV",
   "MQTT_BROKER_URL",
@@ -82,6 +82,8 @@ const LOCAL_DEFAULT_KEYS: ReadonlySet<string> = new Set([
   "DEVICE_TOKEN",
   "GATEWAY_OPERATOR_PORT",
   "SIMULATOR_PANEL_PORT",
+  // Added by the LAN bring-up wave: a bind host, not a credential.
+  "DEVICE_BIND_HOST",
 ]);
 
 /** Keys that must never be assigned anywhere, the two local-only files included. */
@@ -111,7 +113,7 @@ describe("Secret_Check on the real repository", () => {
       expect(LOCAL_DEFAULT_KEYS.has(key), key).toBe(false);
       expect(keys.has(key), `${key} is a Panel_Key`).toBe(true);
     }
-    expect(LOCAL_DEFAULT_KEYS.size).toBe(9);
+    expect(LOCAL_DEFAULT_KEYS.size).toBe(10);
     expect(LOCAL_DEFAULT_FILES.size).toBe(2);
   });
 

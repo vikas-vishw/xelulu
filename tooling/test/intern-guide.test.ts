@@ -148,10 +148,24 @@ describe("the Intern_Guide's endpoints and flags (Req 6.2, 6.3)", () => {
     }
   });
 
-  it("records the C17 loopback FLAG and the simulator standing in", () => {
-    expect(guide).toContain("C17");
+  // The LAN bring-up wave closed FLAG C17, so the guide no longer defers the question: it has to
+  // name the one value that opens the device ports, say that opening them opens nothing human,
+  // and say that an unauthenticated device is still refused.
+  it("tells the reader how to open the LAN bind and what it does not open", () => {
+    expect(guide).toContain("DEVICE_BIND_HOST");
     expect(guideLower).toContain("loopback");
     expect(guideLower).toContain("simulator");
+    // The console, panel and dashboard stay shut whatever the bind says.
+    expect(guideLower).toContain("loopback only, always");
+    // And the bind is not the door: a token is.
+    expect(guide).toContain("DEVICE_TOKEN");
+    expect(guideLower).toContain("anonymous broker access is off");
+    expect(guideLower).toContain("refused");
+    // Actuation is opt-in, not implied by pairing.
+    expect(guide).toContain("--device-control");
+    // The stale blocker wording must be gone, not merely supplemented.
+    expect(guide).not.toContain("C17");
+    expect(guideLower).not.toContain("cannot reach the local gateway");
   });
 });
 

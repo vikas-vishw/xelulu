@@ -17,26 +17,47 @@ drawn from those two.
 
 ---
 
-## 1. Read this first: the local stack is loopback-only
+## 1. Read this first: the stack is closed until you open it
 
-**FLAG C17, open, awaiting Omar's ruling.** The local stack publishes its surfaces on host
-`127.0.0.1` only, and the audio WebSocket port is not published to the host at all. So a physical
-robot sitting on your LAN **cannot reach the local gateway yet**, no matter what you point its
-firmware at. Widening a bind host is a security decision and is not ours to take in this phase.
+The device-facing ports are bound to `127.0.0.1` by default, so a clean checkout is not exposed to
+your network. One env value opens them, and it opens **only** those ports:
 
-What that means in practice:
+Set `DEVICE_BIND_HOST` to `0.0.0.0` in the root `.env`. The key ships empty in `.env.example`, and `.env.local.example` ships it closed at `127.0.0.1`.
 
-- Everything in §2 to §8 works today with the **simulator** standing in for the robot. The
-  simulator speaks Document B over the same broker, so a green matrix against it is real
-  verification of the cloud side.
-- Pointing real firmware at the stack needs two things that do not exist yet: the gateway's audio
-  port published, and the broker and audio surfaces bound beyond loopback. Ask Omar; do not work
-  around it by editing `docker-compose.yml`.
-- Until then, use the simulator to confirm the cloud behaves, and read §9 as the specification
-  your firmware must satisfy.
+Put that in the root `.env`, then `docker compose up --build`. What it moves:
+
+| Surface | Closed (default) | With `DEVICE_BIND_HOST=0.0.0.0` |
+| --- | --- | --- |
+| MQTT broker, 1883 and 8883 | `127.0.0.1` only | reachable on your LAN IP |
+| Gateway audio socket, 8081 | `127.0.0.1` only | reachable on your LAN IP |
+
+What it does **not** move, ever: the developer console (8090), the simulator panel (8091), the
+EMQX dashboard (18083) and the MQTT-over-WebSocket ports (8083, 8084). Those stay on `127.0.0.1`
+whatever you set, and a test in `tooling/test/lan-bind.test.ts` fails the build if that changes.
+
+**Opening the bind does not open the door.** Anonymous broker access is off. Every client must
+present a username and password that EMQX knows before it may publish or subscribe on any topic:
+
+- your **device** presents its `DEVICE_ID` as the username and its `DEVICE_TOKEN` as the password;
+- the **gateway** presents `MQTT_USERNAME` and `MQTT_PASSWORD`, a different principal, so a leaked
+  device token cannot impersonate the cloud.
+
+A device on the Wi-Fi with no token, a wrong token, or an unknown id is refused at the broker and
+never reaches a Document B topic. The gateway then checks the token a second time, at `hello`: a
+session whose `auth` does not match is marked and its `status`, `event` and `ack` messages are
+dropped until a matching `hello` arrives. Two independent checks, and the refusal is logged as ids
+and enums only, never as text.
+
+**Device actuation is a separate switch.** The Device control tab needs the gateway started with
+`--device-control`, which local Compose does **not** pass by default. Bring it up with
+`pnpm dev:admin:device`, or add the flag to the gateway `command` yourself. Reading the Devices tab
+and the Test Matrix needs no flag.
+
+**This is a dev-LAN setup, not an internet-facing one.** Plain MQTT on 1883 is unencrypted; 8883
+carries the local TLS the stack already ships. Do not port-forward any of this to the internet, and
+do not treat the dev placeholders in `.env.local.example` as secrets.
 
 ---
-
 ## 2. Run the stack
 
 From a clean checkout, in the repository root. The root `README.md` section **"Local run: from a
@@ -59,11 +80,12 @@ What is listening, once the stack is up:
 
 | Surface | Address | Published to the host? |
 | --- | --- | --- |
-| MQTT (EMQX) | `127.0.0.1:1883` plain, `:8883` TLS | yes, loopback only |
-| EMQX dashboard | `127.0.0.1:18083` | yes, loopback only |
-| Gateway operator surface | `127.0.0.1:8090` | yes, loopback only |
-| Simulator control panel | `127.0.0.1:8091` | yes, loopback only |
-| Gateway audio WebSocket | port 8081 inside the Compose network | **no** (FLAG C17) |
+| MQTT (EMQX) | `1883` plain, `8883` TLS | yes, on `DEVICE_BIND_HOST` (loopback by default) |
+| Gateway audio WebSocket | `8081` | yes, on `DEVICE_BIND_HOST` (loopback by default) |
+| EMQX dashboard | `127.0.0.1:18083` | yes, loopback only, always |
+| Gateway operator surface | `127.0.0.1:8090` | yes, loopback only, always |
+| Simulator control panel | `127.0.0.1:8091` | yes, loopback only, always |
+| MQTT over WebSocket | `127.0.0.1:8083` and `:8084` | yes, loopback only, always |
 
 Both local surfaces are unauthenticated and internal. Use `127.0.0.1` in the browser, never
 `localhost`: `localhost` can resolve to `::1`, which a loopback-only publish does not serve.

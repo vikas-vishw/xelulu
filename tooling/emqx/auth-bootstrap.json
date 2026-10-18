@@ -1,0 +1,9 @@
+[
+  { "user_id": "xlu_000123", "password": "dev_local_only_not_a_secret", "is_superuser": false },
+  {
+    "user_id": "xelulu_gateway_dev",
+    "password": "dev_gateway_only_not_a_secret",
+    "is_superuser": false
+  },
+  { "user_id": "xlu_ci_sim", "password": "dev_ci_sim_only_not_a_secret", "is_superuser": false }
+]

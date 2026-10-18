@@ -21,16 +21,23 @@ const LOCAL_ENV_PATH = join(ROOT, ".env.local.example");
 const EXPECTED_SERVICES = ["emqx", "gateway", "simulator"];
 const EMQX_PORTS = [1883, 8883, 8083, 8084, 18083];
 const NODE_SERVICES = ["gateway", "simulator"] as const;
-// Phase 1.3 Req 3.3 and 3.4 (C8, C9): one host-loopback port each, raw YAML text before interpolation.
-const NODE_SERVICE_PORTS: Record<(typeof NODE_SERVICES)[number], string> = {
-  gateway: "127.0.0.1:${GATEWAY_OPERATOR_PORT:-8090}:${GATEWAY_OPERATOR_PORT:-8090}",
-  simulator: "127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}",
+/** The one host reference the device-facing publishes may use. Its default keeps them closed. */
+const BIND_REFERENCE = "${DEVICE_BIND_HOST:-127.0.0.1}";
+// Phase 1.3 Req 3.3 and 3.4 (C8, C9), as amended by the LAN bring-up wave: each Node service's
+// exact publishes, as raw YAML text before interpolation. The human surfaces keep their literal
+// loopback host; the gateway also publishes the device-facing audio socket behind BIND_REFERENCE.
+const NODE_SERVICE_PORTS: Record<(typeof NODE_SERVICES)[number], readonly string[]> = {
+  gateway: [
+    "127.0.0.1:${GATEWAY_OPERATOR_PORT:-8090}:${GATEWAY_OPERATOR_PORT:-8090}",
+    BIND_REFERENCE + ":8081:8081",
+  ],
+  simulator: ["127.0.0.1:${SIMULATOR_PANEL_PORT:-8091}:${SIMULATOR_PANEL_PORT:-8091}"],
 };
 // Req 21.7: each service's exact `command`. The gateway also carries the Transcripts_Argument, so
 // the local stack's operator channel shows transcript text, the Content_Admin_Argument, so the
-// Content page's writes are accepted, and the Phase 6 Device_Control_Argument, so the console's
-// Device Control page may fire the five allow-listed commands through the Device_Action_Gate (all
-// three Local_Mode only); the simulator takes none of them.
+// Content page's writes are accepted (both Local_Mode only); the simulator takes neither. The
+// Phase 6 Device_Control_Argument is deliberately NOT here: the LAN bring-up wave made device
+// actuation opt-in, so firing a command needs pnpm dev:admin:device or an explicit edit.
 const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly string[]> = {
   gateway: [
     "node",
@@ -38,7 +45,6 @@ const NODE_SERVICE_COMMAND: Record<(typeof NODE_SERVICES)[number], readonly stri
     "--listen-all-interfaces",
     "--operator-transcripts",
     "--content-admin",
-    "--device-control",
   ],
   simulator: ["node", "dist/index.js", "--listen-all-interfaces"],
 };
@@ -52,15 +58,37 @@ const DEVICE_TOKEN_DEFAULT = "dev_local_only_not_a_secret";
 const SHARED_SERVICE_ENV: readonly EnvEntry[] = [
   ["APP_ENV", "local"],
   ["MQTT_BROKER_URL", "mqtt://emqx:1883"],
-  ["MQTT_USERNAME", null],
-  ["MQTT_PASSWORD", null],
   ["AUDIO_WSS_URL", "ws://gateway:8081"],
   ["DEVICE_ID", "xlu_000123"],
   ["DEVICE_TOKEN", DEVICE_TOKEN_DEFAULT],
 ];
+// The broker credential is the one key the two services must NOT share. Anonymous access is off,
+// so the gateway carries its own default; the simulator keeps the bare form, and a null (unset or
+// empty) credential is exactly what makes it authenticate as the device with DEVICE_ID and
+// DEVICE_TOKEN. Giving the simulator the cloud default would let the device impersonate the cloud.
+const GATEWAY_BROKER_ENV: readonly EnvEntry[] = [
+  ["MQTT_USERNAME", "xelulu_gateway_dev"],
+  ["MQTT_PASSWORD", "dev_gateway_only_not_a_secret"],
+];
+const DEVICE_BROKER_ENV: readonly EnvEntry[] = [
+  ["MQTT_USERNAME", null],
+  ["MQTT_PASSWORD", null],
+];
 const NODE_SERVICE_ENV: Record<(typeof NODE_SERVICES)[number], readonly EnvEntry[]> = {
-  gateway: [...SHARED_SERVICE_ENV, ["GATEWAY_OPERATOR_PORT", "8090"]],
-  simulator: [...SHARED_SERVICE_ENV, ["SIMULATOR_PANEL_PORT", "8091"]],
+  gateway: [
+    SHARED_SERVICE_ENV[0] as EnvEntry,
+    SHARED_SERVICE_ENV[1] as EnvEntry,
+    ...GATEWAY_BROKER_ENV,
+    ...SHARED_SERVICE_ENV.slice(2),
+    ["GATEWAY_OPERATOR_PORT", "8090"],
+  ],
+  simulator: [
+    SHARED_SERVICE_ENV[0] as EnvEntry,
+    SHARED_SERVICE_ENV[1] as EnvEntry,
+    ...DEVICE_BROKER_ENV,
+    ...SHARED_SERVICE_ENV.slice(2),
+    ["SIMULATOR_PANEL_PORT", "8091"],
+  ],
 };
 
 /** `${KEY:-default}`, or the bare `${KEY}` when there is no default. */
@@ -80,7 +108,13 @@ function expectedEnvironment(name: (typeof NODE_SERVICES)[number]): Record<strin
  */
 function expectedLocalEnv(): ReadonlyMap<string, string> {
   const expected = new Map<string, string>();
+  // DEVICE_BIND_HOST first: it is interpolated into `ports:`, not into any service environment,
+  // so the service tuples never mention it, but a copied example must still carry it - closed.
+  expected.set("DEVICE_BIND_HOST", "127.0.0.1");
   for (const name of NODE_SERVICES) {
+    // The gateway is iterated first and the simulator second, so where the two disagree the
+    // DEVICE value wins. That is deliberate: copying this file must not hand the simulator the
+    // cloud credential, so the example carries the empty broker credential, not the gateway one.
     for (const [key, fallback] of NODE_SERVICE_ENV[name]) expected.set(key, fallback ?? "");
   }
   return expected;
@@ -185,10 +219,15 @@ describe("docker-compose.yml (static)", () => {
     expect(service("emqx").image).toMatch(/^emqx\/emqx:\d+\.\d+\.\d+$/);
   });
 
-  it("publishes exactly the five EMQX ports, each bound to 127.0.0.1", () => {
+  // The LAN bring-up wave split these: the two device-facing broker ports moved behind
+  // DEVICE_BIND_HOST (default loopback) so a physical robot can reach them; the dashboard and the
+  // WebSocket ports are human surfaces and stay on a literal 127.0.0.1 that no env value moves.
+  it("publishes exactly the five EMQX ports, device-facing ones behind the bind host", () => {
     const ports = service("emqx").ports;
     expect(Array.isArray(ports)).toBe(true);
-    const expected = EMQX_PORTS.map((p) => `127.0.0.1:${p}:${p}`);
+    const expected = EMQX_PORTS.map((p) =>
+      p === 1883 || p === 8883 ? `${BIND_REFERENCE}:${p}:${p}` : `127.0.0.1:${p}:${p}`,
+    );
     expect([...(ports as unknown[])].map(String).sort()).toEqual([...expected].sort());
   });
 
@@ -198,16 +237,23 @@ describe("docker-compose.yml (static)", () => {
       expect(Array.isArray(svc.ports), `service ${name} ports`).toBe(true);
       for (const entry of svc.ports as unknown[]) {
         const text = typeof entry === "string" ? entry : JSON.stringify(entry);
-        expect(text.startsWith("127.0.0.1:"), `service ${name} port "${text}"`).toBe(true);
-        expect(text, `service ${name} port "${text}"`).not.toContain("0.0.0.0");
+        // Either a literal loopback publish, or the one bind reference whose default is
+        // loopback. Nothing may publish bare, and no literal 0.0.0.0 may be committed.
+        const loopback = text.startsWith("127.0.0.1:");
+        const behindBind = text.startsWith(`${BIND_REFERENCE}:`);
+        expect(loopback || behindBind, `service ${name} port "${text}"`).toBe(true);
+        expect(text.replace(BIND_REFERENCE, ""), `service ${name} port "${text}"`).not.toContain(
+          "0.0.0.0",
+        );
       }
     }
   });
 
-  it("has an environment block on the two Node services only", () => {
-    expect(service("emqx"), "service emqx").not.toHaveProperty("environment");
-    // Exactly two `environment:` keys in the raw text, so no third block can slip in.
-    expect(rawCompose.match(/^\s*environment\s*:/gm) ?? []).toHaveLength(2);
+  it("has an environment block on all three services", () => {
+    // EMQX gained one when anonymous access was turned off: the authenticator is configured
+    // entirely through EMQX_AUTHENTICATION__1__* env vars. Three blocks, so no fourth can slip in.
+    expect(service("emqx"), "service emqx").toHaveProperty("environment");
+    expect(rawCompose.match(/^\s*environment\s*:/gm) ?? []).toHaveLength(3);
   });
 
   it("carries a comment saying the default dashboard credentials are for local development only", () => {
@@ -237,11 +283,14 @@ describe("docker-compose.yml (static)", () => {
       expect(service(name).restart).toBe("no");
     });
 
-    it("publishes exactly its one loopback-only port", () => {
+    it("publishes exactly its pinned ports, human ones on literal loopback", () => {
       const ports = service(name).ports;
-      expect(ports).toEqual([NODE_SERVICE_PORTS[name]]);
+      expect(ports).toEqual(NODE_SERVICE_PORTS[name]);
       for (const entry of ports as unknown[]) {
-        expect(String(entry).startsWith("127.0.0.1:"), `port "${String(entry)}"`).toBe(true);
+        const text = String(entry);
+        const human = text.startsWith("127.0.0.1:");
+        const device = text.startsWith(BIND_REFERENCE + ":");
+        expect(human || device, `port "${text}"`).toBe(true);
       }
     });
 
@@ -278,11 +327,16 @@ describe("docker-compose.yml (static)", () => {
       }
     });
 
-    it("supplies no broker credential: both MQTT credential keys are bare references", () => {
+    // The gateway must carry a credential (anonymous access is off) and the simulator must not
+    // (a null credential is what makes it authenticate as the device). Both halves are pinned.
+    it("supplies a broker credential only where the principal is the cloud", () => {
       const env = service(name).environment as Record<string, string>;
+      const expectedEnv = expectedEnvironment(name);
       for (const key of ["MQTT_USERNAME", "MQTT_PASSWORD"]) {
-        expect(env[key], `${name}.environment.${key}`).toBe("${" + key + "}");
+        expect(env[key], `${name}.environment.${key}`).toBe(expectedEnv[key]);
       }
+      const bare = env["MQTT_USERNAME"] === "${MQTT_USERNAME}";
+      expect(bare, `${name} broker credential`).toBe(name === "simulator");
     });
 
     it("defaults the device token to an unmistakable dev placeholder", () => {
@@ -326,7 +380,7 @@ describe(".env.local.example (static)", () => {
     expect(comments.some((line) => line.includes(".env.example"))).toBe(true);
   });
 
-  it("assigns exactly the nine Local_Mode keys, once each", () => {
+  it("assigns exactly the ten Local_Mode keys, once each", () => {
     expect(entries.map(([key]) => key).sort()).toEqual([...expectedLocalEnv().keys()].sort());
     expect(values.size).toBe(entries.length);
   });
